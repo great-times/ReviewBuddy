@@ -1,0 +1,21 @@
+# 本地配置（含密钥）
+configs/config.yaml
+
+# 运行期数据
+data/
+data/*.db
+data/*.db-*
+data/logs/
+
+# Go
+bin/
+
+# 前端
+web/node_modules/
+web/dist/
+node_modules/
+
+# 杂项
+.claude/
+.DS_Store
+*.log

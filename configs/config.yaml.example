@@ -1,0 +1,21 @@
+# ReviewBuddy 配置模板（复制为 config.yaml 后填写敏感信息）
+server:
+  port: 26405          # 后端端口
+  mode: debug          # debug | release
+
+web:
+  port: 26406          # 前端开发端口（vite）
+
+database:
+  # SQLite 文件路径（纯 Go 驱动 modernc.org/sqlite，无需 CGO）
+  path: ./data/reviewbuddy.db
+
+# LLM / Agent 适配器配置（Hermes Agent 走 OpenAI 兼容端点，支持图片多模态消息）
+agent:
+  provider: openai_compat        # mock | openai_compat | hermes
+  base_url: https://api.example.com/v1   # Hermes / 推理服务的 OpenAI 兼容地址
+  api_key: ""                    # 密钥（不要提交到 git）
+  model: hermes-3                # 生成用模型
+  embedding_model: ""            # 留空则自学习用应用层降级方案
+  timeout_seconds: 120
+  system_prompt: ""              # 可在设置页维护；用于统一约束评审专家角色与输出风格
