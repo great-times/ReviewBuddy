@@ -150,8 +150,8 @@ func (s *Service) Create(g *model.Guide) (*model.Guide, error) {
 	return g, nil
 }
 
-// AIPrecheck 用 Agent 结合规则做预审
-func (s *Service) AIPrecheck(ctx context.Context, content string, images []agent.ImageInput) (*model.AIPrecheckResult, error) {
+// buildPrecheckMessages 组装预审 Prompt（结合 RAG 召回的历史经验）
+func (s *Service) buildPrecheckMessages(content string) []agent.Message {
 	recall := ""
 	if s.knowledge != nil {
 		recall = s.knowledge.Recall(content, 8)
@@ -162,24 +162,46 @@ func (s *Service) AIPrecheck(ctx context.Context, content string, images []agent
 		prompt += "参考已沉淀经验：\n" + recall + "\n"
 	}
 	prompt += "\n### 待审查内容\n" + content
-
-	msgs := []agent.Message{
+	return []agent.Message{
 		{Role: "system", Content: "你是严格的评审专家，只输出 JSON。"},
 		{Role: "user", Content: prompt},
 	}
+}
+
+// parsePrecheck 把模型原始输出解析为结构化结果，解析失败时降级为摘要文本，保证不阻塞
+func parsePrecheck(raw string) *model.AIPrecheckResult {
+	var res model.AIPrecheckResult
+	if jsonStr := extractJSON(raw); jsonStr != "" {
+		if err := json.Unmarshal([]byte(jsonStr), &res); err == nil {
+			return &res
+		}
+	}
+	res.Summary = strings.TrimSpace(raw)
+	return &res
+}
+
+// AIPrecheck 用 Agent 结合规则做预审
+func (s *Service) AIPrecheck(ctx context.Context, content string, images []agent.ImageInput) (*model.AIPrecheckResult, error) {
+	msgs := s.buildPrecheckMessages(content)
 	raw, err := s.agent.Complete(ctx, &agent.CompletionRequest{Messages: msgs, Images: images, Temperature: 0})
 	if err != nil {
 		return nil, err
 	}
-	var res model.AIPrecheckResult
-	if jsonStr := extractJSON(raw); jsonStr != "" {
-		if err := json.Unmarshal([]byte(jsonStr), &res); err == nil {
-			return &res, nil
-		}
+	return parsePrecheck(raw), nil
+}
+
+// AIPrecheckStream 流式预审：边生成边回调原始片段，结束后解析为结构化结果返回
+func (s *Service) AIPrecheckStream(ctx context.Context, content string, images []agent.ImageInput, onChunk func(agent.Chunk)) (*model.AIPrecheckResult, error) {
+	msgs := s.buildPrecheckMessages(content)
+	var buf strings.Builder
+	err := s.agent.CompleteStream(ctx, &agent.CompletionRequest{Messages: msgs, Images: images, Temperature: 0}, func(c agent.Chunk) {
+		buf.WriteString(c.Delta)
+		onChunk(c)
+	})
+	if err != nil {
+		return nil, err
 	}
-	// 解析失败时，把原文作为摘要返回，保证不阻塞
-	res.Summary = strings.TrimSpace(raw)
-	return &res, nil
+	return parsePrecheck(buf.String()), nil
 }
 
 func extractJSON(s string) string {

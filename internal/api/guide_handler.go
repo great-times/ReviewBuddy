@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 
@@ -23,6 +24,7 @@ func (h *GuideHandler) Register(r *gin.RouterGroup) {
 	g.PUT("/:id", ReadWriteRequired(), h.update)
 	g.POST("/generate", h.generate)
 	g.POST("/precheck", h.precheck)
+	g.POST("/precheck/stream", h.precheckStream)
 }
 
 func (h *GuideHandler) list(c *gin.Context) {
@@ -79,6 +81,16 @@ func (h *GuideHandler) update(c *gin.Context) {
 	ok(c, g)
 }
 
+// setupSSE 配置 SSE 响应头并返回 flusher
+func setupSSE(c *gin.Context) (http.Flusher, bool) {
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	flusher, ok := c.Writer.(http.Flusher)
+	return flusher, ok
+}
+
 // generate 通过 SSE 流式返回生成内容
 func (h *GuideHandler) generate(c *gin.Context) {
 	var req guide.GenerateRequest
@@ -86,12 +98,7 @@ func (h *GuideHandler) generate(c *gin.Context) {
 		badRequest(c, err)
 		return
 	}
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
-	c.Writer.Header().Set("Connection", "keep-alive")
-	c.Writer.Header().Set("X-Accel-Buffering", "no")
-
-	flusher, ok := c.Writer.(http.Flusher)
+	flusher, ok := setupSSE(c)
 	if !ok {
 		fail(c, io.ErrUnexpectedEOF)
 		return
@@ -109,6 +116,40 @@ func (h *GuideHandler) generate(c *gin.Context) {
 		c.SSEvent("error", err.Error())
 		flusher.Flush()
 	}
+}
+
+// precheckStream 通过 SSE 流式返回预审：chunk 为模型原始片段，结束时以 result 事件回传结构化结果
+func (h *GuideHandler) precheckStream(c *gin.Context) {
+	var body struct {
+		Content string             `json:"content"`
+		Images  []agent.ImageInput `json:"images"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		badRequest(c, err)
+		return
+	}
+	flusher, ok := setupSSE(c)
+	if !ok {
+		fail(c, io.ErrUnexpectedEOF)
+		return
+	}
+
+	res, err := h.svc.AIPrecheckStream(c.Request.Context(), body.Content, body.Images, func(ch agent.Chunk) {
+		if !ch.Done && ch.Delta != "" {
+			c.SSEvent("chunk", ch.Delta)
+			flusher.Flush()
+		}
+	})
+	if err != nil {
+		c.SSEvent("error", err.Error())
+		flusher.Flush()
+		return
+	}
+	if payload, mErr := json.Marshal(res); mErr == nil {
+		c.SSEvent("result", string(payload))
+	}
+	c.SSEvent("done", "")
+	flusher.Flush()
 }
 
 func (h *GuideHandler) precheck(c *gin.Context) {

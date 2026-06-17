@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Button, Card, Empty, Input, List, Modal, Select, Space, Table, Tag, Typography, Upload, message } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import { Button, Card, Collapse, Empty, Input, List, Modal, Select, Space, Spin, Table, Tag, Typography, Upload, message } from 'antd';
 import type { UploadFile } from 'antd';
 import { PictureOutlined, RobotOutlined, UserAddOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { api, Guide, ImageInput, PrecheckFinding, User } from '../api/client';
+import { api, Guide, ImageInput, PrecheckFinding, User, precheckStream } from '../api/client';
 import { useAuthStore } from '../store/auth';
 
 const { Title } = Typography;
@@ -21,7 +21,14 @@ export default function Reviews() {
   const [prechecking, setPrechecking] = useState(false);
   const [summary, setSummary] = useState('');
   const [findings, setFindings] = useState<PrecheckFinding[]>([]);
+  const [streamText, setStreamText] = useState('');
+  const [streamDone, setStreamDone] = useState(false);
   const canWrite = useAuthStore((s) => s.user?.role !== 'readonly');
+  const streamRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight;
+  }, [streamText]);
 
   const load = () => {
     setLoading(true);
@@ -38,6 +45,8 @@ export default function Reviews() {
     setFiles([]);
     setSummary('');
     setFindings([]);
+    setStreamText('');
+    setStreamDone(false);
     const reviews = await api.listReviews(g.id);
     setReviewers(reviews.map((r) => r.reviewer).filter(Boolean));
   };
@@ -70,15 +79,34 @@ export default function Reviews() {
   const runPrecheck = async () => {
     if (!active) return;
     setPrechecking(true);
+    setSummary('');
+    setFindings([]);
+    setStreamText('');
+    setStreamDone(false);
+    const images = await toImages();
     try {
-      const result = await api.precheck(active.content, await toImages());
-      setSummary(result.summary || 'AI 预审完成');
-      setFindings(result.findings || []);
-      message.success('AI 预审完成');
+      await precheckStream(
+        active.content,
+        images,
+        (delta) => setStreamText((prev) => prev + delta),
+        (result) => {
+          setSummary(result.summary || 'AI 预审完成');
+          setFindings(result.findings || []);
+        },
+        () => {
+          setStreamDone(true);
+          setPrechecking(false);
+          message.success('AI 预审完成');
+        },
+        (msg) => {
+          setStreamDone(true);
+          setPrechecking(false);
+          message.error(msg);
+        }
+      );
     } catch (e: any) {
-      message.error(e.message);
-    } finally {
       setPrechecking(false);
+      message.error(e.message);
     }
   };
 
@@ -153,8 +181,38 @@ export default function Reviews() {
               </Space>
             </>
           )}
+          {(prechecking || streamText) && findings.length === 0 && (
+            <Card
+              size="small"
+              title={
+                <Space>
+                  <RobotOutlined style={{ color: 'var(--color-primary, #1677ff)' }} />
+                  <span>{prechecking ? 'Hermes AI 正在预审…' : 'AI 原始输出'}</span>
+                  {prechecking && <Spin size="small" />}
+                </Space>
+              }
+              style={{ borderColor: 'var(--border-color)' }}
+            >
+              <div
+                ref={streamRef}
+                style={{
+                  maxHeight: 200,
+                  overflow: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  fontFamily: 'var(--font-mono, monospace)',
+                  fontSize: 12,
+                  lineHeight: 1.7,
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                {streamText || '正在连接 Hermes Agent，结合已沉淀规则进行流式预审…'}
+                {prechecking && <span className="cb-blink">▋</span>}
+              </div>
+            </Card>
+          )}
           {(summary || findings.length > 0) && (
-            <Card size="small" title="AI 预审结果" style={{ borderColor: 'var(--border-color)' }}>
+            <Card size="small" title={`AI 预审结果 · 共 ${findings.length} 项`} style={{ borderColor: 'var(--border-color)' }}>
               {summary && <Typography.Paragraph style={{ marginBottom: 8 }}>{summary}</Typography.Paragraph>}
               <List
                 size="small"
@@ -172,6 +230,16 @@ export default function Reviews() {
                   </List.Item>
                 )}
               />
+              {streamText && streamDone && (
+                <Collapse
+                  ghost
+                  size="small"
+                  style={{ marginTop: 8 }}
+                  items={[{ key: 'raw', label: '查看 AI 原始输出', children: (
+                    <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>{streamText}</pre>
+                  ) }]}
+                />
+              )}
             </Card>
           )}
         </Space>

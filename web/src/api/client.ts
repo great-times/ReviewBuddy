@@ -161,20 +161,32 @@ export const api = {
   checkAgentHealth: () => http.post<{ data: { healthy: boolean; message?: string; error?: string } }>('/agent/health').then((r) => r.data.data),
 };
 
-// SSE 流式生成
-export async function generateGuide(
-  body: Record<string, unknown>,
-  onChunk: (text: string) => void,
-  onDone: () => void,
-  onError: (msg: string) => void
-) {
-  const resp = await fetch('/api/guides/generate', {
+// SSE 通用流式读取器：自动带鉴权头，按 event 分发到对应回调
+type SSEHandlers = Record<string, (data: string) => void>;
+
+async function streamSSE(url: string, body: Record<string, unknown>, handlers: SSEHandlers) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const resp = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(body),
   });
+  if (!resp.ok) {
+    let msg = `请求失败 (${resp.status})`;
+    try {
+      const j = await resp.json();
+      msg = j?.error || msg;
+    } catch {
+      // ignore
+    }
+    handlers.error?.(msg);
+    return;
+  }
   if (!resp.body) {
-    onError('无响应流');
+    handlers.error?.('无响应流');
     return;
   }
   const reader = resp.body.getReader();
@@ -194,11 +206,45 @@ export async function generateGuide(
         if (line.startsWith('event:')) event = line.slice(6).trim();
         else if (line.startsWith('data:')) dataLines.push(line.slice(5));
       }
-      const data = dataLines.join('\n');
-      if (event === 'chunk') onChunk(data);
-      else if (event === 'done') onDone();
-      else if (event === 'error') onError(data);
+      handlers[event]?.(dataLines.join('\n'));
     }
   }
+}
+
+// SSE 流式生成
+export async function generateGuide(
+  body: Record<string, unknown>,
+  onChunk: (text: string) => void,
+  onDone: () => void,
+  onError: (msg: string) => void
+) {
+  await streamSSE('/api/guides/generate', body, {
+    chunk: onChunk,
+    done: onDone,
+    error: onError,
+  });
   onDone();
+}
+
+// SSE 流式预审：chunk 为模型原始片段，result 为最终结构化结果
+export async function precheckStream(
+  content: string,
+  images: ImageInput[],
+  onChunk: (text: string) => void,
+  onResult: (res: { summary: string; findings: PrecheckFinding[] }) => void,
+  onDone: () => void,
+  onError: (msg: string) => void
+) {
+  await streamSSE('/api/guides/precheck/stream', { content, images }, {
+    chunk: onChunk,
+    result: (data) => {
+      try {
+        onResult(JSON.parse(data));
+      } catch {
+        onError('结果解析失败');
+      }
+    },
+    done: onDone,
+    error: onError,
+  });
 }
