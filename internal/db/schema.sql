@@ -11,6 +11,41 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS review_roles (
+    id          TEXT PRIMARY KEY,
+    role_key    TEXT NOT NULL UNIQUE,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    system      INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS review_domains (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS domain_role_users (
+    domain_id TEXT NOT NULL,
+    role_key  TEXT NOT NULL,
+    user_id   TEXT NOT NULL,
+    PRIMARY KEY (domain_id, role_key, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_domain_role_users_domain ON domain_role_users(domain_id);
+
+CREATE TABLE IF NOT EXISTS review_scenarios (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    role_keys   TEXT NOT NULL DEFAULT '[]',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS auth_tokens (
     token      TEXT PRIMARY KEY,
     user_id    TEXT NOT NULL,

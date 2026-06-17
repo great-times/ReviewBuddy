@@ -4,7 +4,7 @@ import type { UploadFile } from 'antd';
 import { PictureOutlined, RobotOutlined, UserAddOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { api, Guide, ImageInput, PrecheckFinding, User, precheckStream } from '../api/client';
+import { api, DomainRoleUsers, Guide, ImageInput, PrecheckFinding, ReviewDomain, ReviewRole, ReviewScenario, User, precheckStream } from '../api/client';
 import { useAuthStore } from '../store/auth';
 
 const { Title } = Typography;
@@ -16,6 +16,12 @@ export default function Reviews() {
   const [active, setActive] = useState<Guide | null>(null);
   const [note, setNote] = useState('');
   const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<ReviewRole[]>([]);
+  const [domains, setDomains] = useState<ReviewDomain[]>([]);
+  const [scenarios, setScenarios] = useState<ReviewScenario[]>([]);
+  const [domainRoleUsers, setDomainRoleUsers] = useState<DomainRoleUsers[]>([]);
+  const [domainId, setDomainId] = useState('');
+  const [scenarioId, setScenarioId] = useState('');
   const [reviewers, setReviewers] = useState<string[]>([]);
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [prechecking, setPrechecking] = useState(false);
@@ -36,8 +42,44 @@ export default function Reviews() {
   };
   useEffect(() => {
     load();
-    api.listUsers().then(setUsers).catch(() => {});
+    Promise.all([
+      api.listUsers(),
+      api.listReviewRoles(),
+      api.listReviewDomains(),
+      api.listReviewScenarios(),
+    ]).then(([u, r, d, s]) => {
+      setUsers(u);
+      setRoles(r);
+      setDomains(d);
+      setScenarios(s);
+      setDomainId(d[0]?.id || '');
+      setScenarioId(s[0]?.id || '');
+      if (d[0]?.id) api.listDomainRoleUsers(d[0].id).then(setDomainRoleUsers).catch(() => {});
+    }).catch(() => {});
   }, []);
+
+  const roleMeta = Object.fromEntries(roles.map((r) => [r.key, r]));
+  const roleName = (key: string) => roleMeta[key]?.name || (key === 'admin' ? '管理员' : key === 'readonly' ? '只读' : key);
+  const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
+  const reviewerOptions = users
+    .filter((u) => u.role !== 'readonly')
+    .map((u) => ({ value: u.username, label: `${u.username} · ${roleName(u.role)}` }));
+
+  const applyDefaults = async (nextDomainId = domainId, nextScenarioId = scenarioId) => {
+    if (!nextDomainId || !nextScenarioId) return;
+    const roleUsers = nextDomainId === domainId && domainRoleUsers.length > 0
+      ? domainRoleUsers
+      : await api.listDomainRoleUsers(nextDomainId);
+    setDomainRoleUsers(roleUsers);
+    const scenario = scenarios.find((s) => s.id === nextScenarioId);
+    const requiredRoles = scenario?.roleKeys || [];
+    const names = roleUsers
+      .filter((item) => requiredRoles.includes(item.roleKey))
+      .flatMap((item) => item.userIds)
+      .map((id) => usersById[id]?.username)
+      .filter(Boolean) as string[];
+    setReviewers(Array.from(new Set(names)));
+  };
 
   const openReview = async (g: Guide) => {
     setActive(g);
@@ -48,7 +90,12 @@ export default function Reviews() {
     setStreamText('');
     setStreamDone(false);
     const reviews = await api.listReviews(g.id);
-    setReviewers(reviews.map((r) => r.reviewer).filter(Boolean));
+    const existing = reviews.map((r) => r.reviewer).filter(Boolean);
+    if (existing.length > 0) {
+      setReviewers(existing);
+    } else {
+      await applyDefaults();
+    }
   };
 
   const ensureReviews = async () => {
@@ -162,9 +209,34 @@ export default function Reviews() {
                 placeholder="选择评审人"
                 value={reviewers}
                 onChange={setReviewers}
-                options={users.filter((u) => u.role !== 'readonly').map((u) => ({ value: u.username, label: `${u.username} · ${u.role}` }))}
+                options={reviewerOptions}
                 suffixIcon={<UserAddOutlined />}
               />
+              <Space wrap>
+                <Select
+                  style={{ minWidth: 180 }}
+                  placeholder="选择领域"
+                  value={domainId || undefined}
+                  options={domains.map((d) => ({ value: d.id, label: d.name }))}
+                  onChange={async (value) => {
+                    setDomainId(value);
+                    await applyDefaults(value, scenarioId);
+                  }}
+                />
+                <Select
+                  style={{ minWidth: 180 }}
+                  placeholder="选择审批场景"
+                  value={scenarioId || undefined}
+                  options={scenarios.map((s) => ({ value: s.id, label: s.name }))}
+                  onChange={async (value) => {
+                    setScenarioId(value);
+                    await applyDefaults(domainId, value);
+                  }}
+                />
+                <Button icon={<UserAddOutlined />} onClick={() => applyDefaults()}>
+                  带出默认评审人
+                </Button>
+              </Space>
               <Space wrap>
                 <Upload
                   accept="image/*"

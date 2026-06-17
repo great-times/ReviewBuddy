@@ -68,13 +68,46 @@ export interface Review {
   finishedAt: string;
 }
 
-export type UserRole = 'admin' | 'readonly' | 'developer' | 'ops' | 'tester' | 'architect' | 'designer';
+export type UserRole = string;
 
 export interface User {
   id: string;
   username: string;
   role: UserRole;
   enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewRole {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  system: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewDomain {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DomainRoleUsers {
+  domainId: string;
+  roleKey: string;
+  userIds: string[];
+}
+
+export interface ReviewScenario {
+  id: string;
+  name: string;
+  description: string;
+  roleKeys: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -154,6 +187,31 @@ export const api = {
   createUser: (u: Partial<User>) => http.post<{ data: User }>('/users', u).then((r) => r.data.data),
   updateUser: (id: string, u: Partial<User>) => http.put<{ data: User }>(`/users/${id}`, u).then((r) => r.data.data),
   deleteUser: (id: string) => http.delete(`/users/${id}`),
+
+  listReviewRoles: () => http.get<{ data: ReviewRole[] }>('/review-roles').then((r) => r.data.data),
+  createReviewRole: (role: Partial<ReviewRole>) =>
+    http.post<{ data: ReviewRole }>('/review-roles', role).then((r) => r.data.data),
+  updateReviewRole: (key: string, role: Partial<ReviewRole>) =>
+    http.put<{ data: ReviewRole }>(`/review-roles/${key}`, role).then((r) => r.data.data),
+  deleteReviewRole: (key: string) => http.delete(`/review-roles/${key}`),
+
+  listReviewDomains: () => http.get<{ data: ReviewDomain[] }>('/review-domains').then((r) => r.data.data),
+  createReviewDomain: (domain: Partial<ReviewDomain>) =>
+    http.post<{ data: ReviewDomain }>('/review-domains', domain).then((r) => r.data.data),
+  updateReviewDomain: (id: string, domain: Partial<ReviewDomain>) =>
+    http.put<{ data: ReviewDomain }>(`/review-domains/${id}`, domain).then((r) => r.data.data),
+  deleteReviewDomain: (id: string) => http.delete(`/review-domains/${id}`),
+  listDomainRoleUsers: (domainId: string) =>
+    http.get<{ data: DomainRoleUsers[] }>(`/review-domains/${domainId}/role-users`).then((r) => r.data.data),
+  updateDomainRoleUsers: (domainId: string, roleKey: string, userIds: string[]) =>
+    http.put<{ data: DomainRoleUsers }>(`/review-domains/${domainId}/role-users/${roleKey}`, { userIds }).then((r) => r.data.data),
+
+  listReviewScenarios: () => http.get<{ data: ReviewScenario[] }>('/review-scenarios').then((r) => r.data.data),
+  createReviewScenario: (scenario: Partial<ReviewScenario>) =>
+    http.post<{ data: ReviewScenario }>('/review-scenarios', scenario).then((r) => r.data.data),
+  updateReviewScenario: (id: string, scenario: Partial<ReviewScenario>) =>
+    http.put<{ data: ReviewScenario }>(`/review-scenarios/${id}`, scenario).then((r) => r.data.data),
+  deleteReviewScenario: (id: string) => http.delete(`/review-scenarios/${id}`),
 
   getAgentSettings: () => http.get<{ data: AgentSettings }>('/settings/agent').then((r) => r.data.data),
   updateAgentSettings: (s: AgentSettings) => http.put<{ data: AgentSettings }>('/settings/agent', s).then((r) => r.data.data),

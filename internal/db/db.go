@@ -66,5 +66,81 @@ func migrate(conn *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	if err := migrateReviewConfig(conn, now); err != nil {
+		return err
+	}
 	return nil
+}
+
+func migrateReviewConfig(conn *sql.DB, now string) error {
+	_, err := conn.Exec(`
+		CREATE TABLE IF NOT EXISTS review_roles (
+			id TEXT PRIMARY KEY,
+			role_key TEXT NOT NULL UNIQUE,
+			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			system INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS review_domains (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			description TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS domain_role_users (
+			domain_id TEXT NOT NULL,
+			role_key TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			PRIMARY KEY (domain_id, role_key, user_id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_domain_role_users_domain ON domain_role_users(domain_id);
+		CREATE TABLE IF NOT EXISTS review_scenarios (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			description TEXT NOT NULL DEFAULT '',
+			role_keys TEXT NOT NULL DEFAULT '[]',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		);
+	`)
+	if err != nil {
+		return err
+	}
+	defaultRoles := []struct {
+		key, name, desc string
+		system          int
+	}{
+		{"admin", "管理员", "平台管理与配置维护", 1},
+		{"readonly", "只读", "新注册用户默认角色，仅可查看", 1},
+		{"developer", "开发", "研发实现与代码评审", 0},
+		{"ops", "运维", "发布、运行与稳定性评审", 0},
+		{"tester", "测试", "测试策略与质量验证评审", 0},
+		{"architect", "架构", "技术方案与架构风险评审", 0},
+		{"designer", "设计", "产品体验与交互设计评审", 0},
+	}
+	for _, r := range defaultRoles {
+		if _, err := conn.Exec(`
+			INSERT INTO review_roles (id,role_key,name,description,system,created_at,updated_at)
+			SELECT ?,?,?,?,?,?,?
+			WHERE NOT EXISTS (SELECT 1 FROM review_roles WHERE role_key=?)
+		`, r.key, r.key, r.name, r.desc, r.system, now, now, r.key); err != nil {
+			return err
+		}
+	}
+	if _, err := conn.Exec(`
+		INSERT INTO review_domains (id,name,description,created_at,updated_at)
+		SELECT 'default', '默认领域', '通用评审领域，可按业务线或系统继续拆分。', ?, ?
+		WHERE NOT EXISTS (SELECT 1 FROM review_domains WHERE id='default')
+	`, now, now); err != nil {
+		return err
+	}
+	_, err = conn.Exec(`
+		INSERT INTO review_scenarios (id,name,description,role_keys,created_at,updated_at)
+		SELECT 'standard', '标准评审', '默认评审场景，覆盖常见研发协同角色。', '["developer","tester","architect"]', ?, ?
+		WHERE NOT EXISTS (SELECT 1 FROM review_scenarios WHERE id='standard')
+	`, now, now)
+	return err
 }

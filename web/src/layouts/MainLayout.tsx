@@ -35,21 +35,7 @@ export default function MainLayout() {
   const { currentTheme, setTheme } = useThemeStore();
   const { user, logout } = useAuthStore();
   const visibleMenuItems = user?.role === 'admin' ? menuItems : menuItems.filter((m) => m.key !== '/users');
-  const roleLabel = user?.role === 'admin'
-    ? '管理员'
-    : user?.role === 'readonly'
-      ? '只读'
-    : user?.role === 'developer'
-      ? '开发'
-      : user?.role === 'ops'
-        ? '运维'
-        : user?.role === 'tester'
-          ? '测试'
-          : user?.role === 'architect'
-            ? '架构'
-            : user?.role === 'designer'
-              ? '设计'
-              : user?.role || '';
+  const roleLabel = user?.role === 'admin' ? '管理员' : user?.role === 'readonly' ? '只读' : user?.role || '';
 
   const selectedKey =
     visibleMenuItems

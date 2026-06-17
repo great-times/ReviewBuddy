@@ -107,6 +107,39 @@ type User struct {
 	UpdatedAt    string `json:"updatedAt"`
 }
 
+type ReviewRole struct {
+	ID          string `json:"id"`
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	System      bool   `json:"system"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+type ReviewDomain struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+type DomainRoleUsers struct {
+	DomainID string   `json:"domainId"`
+	RoleKey  string   `json:"roleKey"`
+	UserIDs  []string `json:"userIds"`
+}
+
+type ReviewScenario struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	RoleKeys    []string `json:"roleKeys"`
+	CreatedAt   string   `json:"createdAt"`
+	UpdatedAt   string   `json:"updatedAt"`
+}
+
 type AuthToken struct {
 	Token     string `json:"token"`
 	UserID    string `json:"userId"`

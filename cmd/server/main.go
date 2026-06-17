@@ -16,6 +16,7 @@ import (
 	"changebuddy/internal/service/auth"
 	"changebuddy/internal/service/guide"
 	"changebuddy/internal/service/knowledge"
+	"changebuddy/internal/service/reviewconfig"
 	"changebuddy/internal/service/settings"
 	"changebuddy/internal/service/template"
 	"changebuddy/internal/service/user"
@@ -44,8 +45,10 @@ func main() {
 	knowledgeRepo := repo.NewKnowledgeRepo(database)
 	userRepo := repo.NewUserRepo(database)
 	settingsRepo := repo.NewSettingsRepo(database)
+	reviewConfigRepo := repo.NewReviewConfigRepo(database)
 
 	settingsSvc := settings.NewService(settingsRepo, cfg.Agent)
+	reviewConfigSvc := reviewconfig.NewService(reviewConfigRepo, userRepo)
 
 	// agent (Hermes / OpenAI 兼容；未配置时回退 mock)
 	ag := agent.NewDynamicAdapter(settingsSvc)
@@ -56,7 +59,7 @@ func main() {
 	tplSvc := template.NewService(tplRepo)
 	guideSvc := guide.NewService(guideRepo, tplRepo, ag, knowledgeSvc)
 	reviewSvc := guide.NewReviewService(reviewRepo, guideRepo, tplRepo, knowledgeSvc)
-	userSvc := user.NewService(userRepo)
+	userSvc := user.NewService(userRepo, reviewConfigSvc)
 	authSvc := auth.NewService(userRepo)
 
 	seedTemplates(tplSvc)
@@ -88,10 +91,12 @@ func main() {
 	api.NewKnowledgeHandler(knowledgeSvc).Register(protected)
 	api.NewSettingsHandler(settingsSvc).Register(protected)
 	api.NewUserHandler(userSvc, authSvc).RegisterReadOnly(protected)
+	api.NewReviewConfigHandler(reviewConfigSvc).RegisterReadOnly(protected)
 
 	adminGroup := protected.Group("")
 	adminGroup.Use(authHandler.AdminRequired())
 	api.NewUserHandler(userSvc, authSvc).RegisterAdmin(adminGroup)
+	api.NewReviewConfigHandler(reviewConfigSvc).RegisterAdmin(adminGroup)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("ReviewBuddy server listening on %s", addr)

@@ -10,19 +10,16 @@ import (
 	"changebuddy/internal/repo"
 )
 
-var roles = map[string]bool{
-	"admin":     true,
-	"readonly":  true,
-	"developer": true,
-	"ops":       true,
-	"tester":    true,
-	"architect": true,
-	"designer":  true,
+type RoleChecker interface {
+	RoleExists(key string) (bool, error)
 }
 
-type Service struct{ repo *repo.UserRepo }
+type Service struct {
+	repo  *repo.UserRepo
+	roles RoleChecker
+}
 
-func NewService(r *repo.UserRepo) *Service { return &Service{repo: r} }
+func NewService(r *repo.UserRepo, roles RoleChecker) *Service { return &Service{repo: r, roles: roles} }
 
 func (s *Service) List() ([]model.User, error) { return s.repo.List() }
 
@@ -33,7 +30,9 @@ func (s *Service) Create(u *model.User) (*model.User, error) {
 	if u.Role == "" {
 		u.Role = "readonly"
 	}
-	if !roles[u.Role] {
+	if ok, err := s.roleExists(u.Role); err != nil {
+		return nil, err
+	} else if !ok {
 		return nil, errors.New("invalid role")
 	}
 	now := time.Now().Format(time.RFC3339)
@@ -51,7 +50,9 @@ func (s *Service) Update(id string, u *model.User) (*model.User, error) {
 	if u.Username == "" {
 		return nil, errors.New("username is required")
 	}
-	if !roles[u.Role] {
+	if ok, err := s.roleExists(u.Role); err != nil {
+		return nil, err
+	} else if !ok {
 		return nil, errors.New("invalid role")
 	}
 	u.ID = id
@@ -81,4 +82,11 @@ func (s *Service) SeedDefaults() {
 	for i := range defaults {
 		_, _ = s.Create(&defaults[i])
 	}
+}
+
+func (s *Service) roleExists(role string) (bool, error) {
+	if s.roles == nil {
+		return role == "admin" || role == "readonly", nil
+	}
+	return s.roles.RoleExists(role)
 }
