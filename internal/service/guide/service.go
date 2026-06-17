@@ -173,10 +173,12 @@ func parsePrecheck(raw string) *model.AIPrecheckResult {
 	var res model.AIPrecheckResult
 	if jsonStr := extractJSON(raw); jsonStr != "" {
 		if err := json.Unmarshal([]byte(jsonStr), &res); err == nil {
+			res.ParseOK = true
 			return &res
 		}
 	}
 	res.Summary = strings.TrimSpace(raw)
+	res.ParseOK = false
 	return &res
 }
 

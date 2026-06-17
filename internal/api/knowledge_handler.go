@@ -16,6 +16,8 @@ func (h *KnowledgeHandler) Register(r *gin.RouterGroup) {
 	r.POST("/knowledge/issues", ReadWriteRequired(), h.addIssue)
 	r.GET("/knowledge/rules", h.listRules)
 	r.POST("/knowledge/rules", ReadWriteRequired(), h.addRule)
+	r.GET("/knowledge/learning-suggestions", h.listLearningSuggestions)
+	r.POST("/knowledge/learning-suggestions/:id/apply", ReadWriteRequired(), h.applyLearningSuggestion)
 	r.GET("/metrics/quality", h.metrics)
 }
 
@@ -63,6 +65,24 @@ func (h *KnowledgeHandler) addRule(c *gin.Context) {
 		return
 	}
 	ok(c, v)
+}
+
+func (h *KnowledgeHandler) listLearningSuggestions(c *gin.Context) {
+	items, err := h.svc.ListLearningSuggestions(c.Query("status"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	ok(c, items)
+}
+
+func (h *KnowledgeHandler) applyLearningSuggestion(c *gin.Context) {
+	item, err := h.svc.ApplyLearningSuggestion(c.Param("id"))
+	if err != nil {
+		badRequest(c, err)
+		return
+	}
+	ok(c, item)
 }
 
 func (h *KnowledgeHandler) metrics(c *gin.Context) {

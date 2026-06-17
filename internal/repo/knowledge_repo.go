@@ -2,6 +2,7 @@ package repo
 
 import (
 	"database/sql"
+	"encoding/json"
 
 	"reviewbuddy/internal/model"
 )
@@ -88,6 +89,59 @@ func (r *KnowledgeRepo) AddRule(k *model.KnowledgeRule) error {
 	return err
 }
 
+func (r *KnowledgeRepo) AddLearningSuggestion(s *model.ReviewLearningSuggestion) error {
+	issues, _ := json.Marshal(s.Issues)
+	rules, _ := json.Marshal(s.Rules)
+	_, err := r.db.Exec(`INSERT INTO review_learning_suggestions
+		(id,review_id,guide_id,template_id,status,raw_note,summary,issues,rules,template_suggestion,created_at,applied_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		s.ID, s.ReviewID, s.GuideID, s.TemplateID, s.Status, s.RawNote, s.Summary, string(issues), string(rules), s.TemplateSuggestion, s.CreatedAt, nullableString(s.AppliedAt))
+	return err
+}
+
+func (r *KnowledgeRepo) ListLearningSuggestions(status string) ([]model.ReviewLearningSuggestion, error) {
+	q := `SELECT id,review_id,guide_id,template_id,status,raw_note,summary,issues,rules,template_suggestion,created_at,COALESCE(applied_at,'')
+		FROM review_learning_suggestions`
+	args := []any{}
+	if status != "" {
+		q += " WHERE status=?"
+		args = append(args, status)
+	}
+	q += " ORDER BY created_at DESC"
+	rows, err := r.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.ReviewLearningSuggestion{}
+	for rows.Next() {
+		item, err := scanLearningSuggestion(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (r *KnowledgeRepo) GetLearningSuggestion(id string) (*model.ReviewLearningSuggestion, error) {
+	row := r.db.QueryRow(`SELECT id,review_id,guide_id,template_id,status,raw_note,summary,issues,rules,template_suggestion,created_at,COALESCE(applied_at,'')
+		FROM review_learning_suggestions WHERE id=?`, id)
+	item, err := scanLearningSuggestion(row)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (r *KnowledgeRepo) MarkLearningSuggestionApplied(id, appliedAt string) error {
+	_, err := r.db.Exec(`UPDATE review_learning_suggestions SET status='applied', applied_at=? WHERE id=?`, appliedAt, id)
+	return err
+}
+
 // Stats 用于度量看板
 func (r *KnowledgeRepo) Counts() (issues, rules int, err error) {
 	_ = r.db.QueryRow(`SELECT COUNT(*) FROM review_issues`).Scan(&issues)
@@ -96,3 +150,28 @@ func (r *KnowledgeRepo) Counts() (issues, rules int, err error) {
 }
 
 var _ = sql.ErrNoRows
+
+func scanLearningSuggestion(s scanner) (model.ReviewLearningSuggestion, error) {
+	var item model.ReviewLearningSuggestion
+	var issues, rules string
+	err := s.Scan(&item.ID, &item.ReviewID, &item.GuideID, &item.TemplateID, &item.Status, &item.RawNote, &item.Summary, &issues, &rules, &item.TemplateSuggestion, &item.CreatedAt, &item.AppliedAt)
+	if err != nil {
+		return item, err
+	}
+	_ = json.Unmarshal([]byte(issues), &item.Issues)
+	_ = json.Unmarshal([]byte(rules), &item.Rules)
+	if item.Issues == nil {
+		item.Issues = []model.ReviewIssue{}
+	}
+	if item.Rules == nil {
+		item.Rules = []model.KnowledgeRule{}
+	}
+	return item, nil
+}
+
+func nullableString(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}

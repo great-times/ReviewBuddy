@@ -147,6 +147,47 @@ export interface PrecheckFinding {
   suggestion: string;
 }
 
+export interface PrecheckResult {
+  summary: string;
+  findings: PrecheckFinding[];
+  parseOk?: boolean;
+}
+
+export interface ReviewIssue {
+  id?: string;
+  category: string;
+  triggerCondition?: string;
+  problemDesc: string;
+  correctPractice: string;
+  changeType?: string;
+  frequency?: number;
+}
+
+export interface KnowledgeRule {
+  id?: string;
+  title: string;
+  ruleType: string;
+  pattern?: string;
+  suggestion: string;
+  enabled?: boolean;
+  hitCount?: number;
+}
+
+export interface LearningSuggestion {
+  id: string;
+  reviewId: string;
+  guideId: string;
+  templateId: string;
+  status: string;
+  rawNote: string;
+  summary: string;
+  issues: ReviewIssue[];
+  rules: KnowledgeRule[];
+  templateSuggestion: string;
+  createdAt: string;
+  appliedAt: string;
+}
+
 export interface ImageInput {
   dataUrl?: string;
   url?: string;
@@ -193,7 +234,7 @@ export const api = {
   updateGuide: (id: string, g: Partial<Guide>) =>
     http.put<{ data: Guide }>(`/guides/${id}`, g).then((r) => r.data.data),
   precheck: (content: string, images: ImageInput[] = []) =>
-    http.post<{ data: { summary: string; findings: PrecheckFinding[] } }>('/guides/precheck', { content, images }).then((r) => r.data.data),
+    http.post<{ data: PrecheckResult }>('/guides/precheck', { content, images }).then((r) => r.data.data),
 
   listReviews: (guideId: string) =>
     http.get<{ data: Review[] }>(`/guides/${guideId}/reviews`).then((r) => r.data.data),
@@ -203,6 +244,10 @@ export const api = {
     http.post<{ data: Review }>(`/reviews/${rid}/decision`, { status, note }).then((r) => r.data.data),
 
   metrics: () => http.get<{ data: { issueCount: number; ruleCount: number } }>('/metrics/quality').then((r) => r.data.data),
+  listLearningSuggestions: (status?: string) =>
+    http.get<{ data: LearningSuggestion[] }>('/knowledge/learning-suggestions', { params: status ? { status } : {} }).then((r) => r.data.data),
+  applyLearningSuggestion: (id: string) =>
+    http.post<{ data: LearningSuggestion }>(`/knowledge/learning-suggestions/${id}/apply`).then((r) => r.data.data),
   dashboard: () => http.get<{ data: DashboardSummary }>('/dashboard').then((r) => r.data.data),
 
   listUsers: () => http.get<{ data: User[] }>('/users').then((r) => r.data.data),
@@ -316,7 +361,7 @@ export async function precheckStream(
   content: string,
   images: ImageInput[],
   onChunk: (text: string) => void,
-  onResult: (res: { summary: string; findings: PrecheckFinding[] }) => void,
+  onResult: (res: PrecheckResult) => void,
   onDone: () => void,
   onError: (msg: string) => void
 ) {

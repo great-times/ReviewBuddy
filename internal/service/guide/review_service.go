@@ -1,6 +1,8 @@
 package guide
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -9,6 +11,7 @@ import (
 
 	"reviewbuddy/internal/model"
 	"reviewbuddy/internal/repo"
+	"reviewbuddy/internal/service/agent"
 	"reviewbuddy/internal/service/knowledge"
 )
 
@@ -17,11 +20,12 @@ type ReviewService struct {
 	guideRepo *repo.GuideRepo
 	tplRepo   *repo.TemplateRepo
 	userRepo  *repo.UserRepo
+	agent     agent.Adapter
 	knowledge *knowledge.Service
 }
 
-func NewReviewService(r *repo.ReviewRepo, g *repo.GuideRepo, tpl *repo.TemplateRepo, users *repo.UserRepo, kn *knowledge.Service) *ReviewService {
-	return &ReviewService{repo: r, guideRepo: g, tplRepo: tpl, userRepo: users, knowledge: kn}
+func NewReviewService(r *repo.ReviewRepo, g *repo.GuideRepo, tpl *repo.TemplateRepo, users *repo.UserRepo, ag agent.Adapter, kn *knowledge.Service) *ReviewService {
+	return &ReviewService{repo: r, guideRepo: g, tplRepo: tpl, userRepo: users, agent: ag, knowledge: kn}
 }
 
 func (s *ReviewService) ListByGuide(guideID string) ([]model.Review, error) {
@@ -84,47 +88,121 @@ func (s *ReviewService) Decide(reviewID, status, note string) (*model.Review, er
 		}
 		g.UpdatedAt = now
 		_ = s.guideRepo.Update(g)
-		s.learnFromDecision(rv, g, note, now)
+		s.createLearningSuggestion(context.Background(), rv, g, note)
 	}
 	return rv, nil
 }
 
-func (s *ReviewService) learnFromDecision(rv *model.Review, g *model.Guide, note, now string) {
+func (s *ReviewService) createLearningSuggestion(ctx context.Context, rv *model.Review, g *model.Guide, note string) {
 	note = strings.TrimSpace(note)
 	if note == "" || s.knowledge == nil {
 		return
 	}
+	suggestion := s.fallbackLearningSuggestion(rv, g, note)
+	if s.agent != nil {
+		if ai, err := s.analyzeLearningSuggestion(ctx, rv, g, note); err == nil {
+			suggestion = ai
+		}
+	}
+	_, _ = s.knowledge.AddLearningSuggestion(suggestion)
+}
+
+func (s *ReviewService) analyzeLearningSuggestion(ctx context.Context, rv *model.Review, g *model.Guide, note string) (*model.ReviewLearningSuggestion, error) {
+	prompt := `请把以下人工评审意见提炼为可复用的评审知识候选，不要直接修改模板。
+只输出 JSON，格式：
+{"summary":"一句话总结","issues":[{"category":"...","triggerCondition":"...","problemDesc":"...","correctPractice":"...","changeType":"..."}],"rules":[{"title":"...","ruleType":"rule","pattern":"...","suggestion":"..."}],"templateSuggestion":"建议追加到模板中的 Markdown 条目，若无则为空"}
+
+评审材料标题：` + g.Title + `
+风险等级：` + g.RiskLevel + `
+评审结论：` + rv.Status + `
+人工评审意见：
+` + note
+	raw, err := s.agent.Complete(ctx, &agent.CompletionRequest{
+		Messages: []agent.Message{
+			{Role: "system", Content: "你是评审知识工程师，擅长把评审意见提炼为可复用规则和模板更新建议。"},
+			{Role: "user", Content: prompt},
+		},
+		Temperature: 0,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var parsed struct {
+		Summary            string                `json:"summary"`
+		Issues             []model.ReviewIssue   `json:"issues"`
+		Rules              []model.KnowledgeRule `json:"rules"`
+		TemplateSuggestion string                `json:"templateSuggestion"`
+	}
+	if err := json.Unmarshal([]byte(extractJSONObject(raw)), &parsed); err != nil {
+		return nil, err
+	}
+	item := s.fallbackLearningSuggestion(rv, g, note)
+	if strings.TrimSpace(parsed.Summary) != "" {
+		item.Summary = parsed.Summary
+	}
+	if len(parsed.Issues) > 0 {
+		item.Issues = parsed.Issues
+	}
+	if len(parsed.Rules) > 0 {
+		item.Rules = parsed.Rules
+	}
+	item.TemplateSuggestion = parsed.TemplateSuggestion
+	s.normalizeLearningSuggestion(item, rv, g)
+	return item, nil
+}
+
+func (s *ReviewService) fallbackLearningSuggestion(rv *model.Review, g *model.Guide, note string) *model.ReviewLearningSuggestion {
 	category := "人工评审意见"
 	if rv.Status == "rejected" {
 		category = "驳回意见"
 	}
-	_, _ = s.knowledge.AddIssue(&model.ReviewIssue{
-		SourceReviewID:   rv.ID,
-		Category:         category,
-		TriggerCondition: "评审人提交评审意见",
-		ProblemDesc:      note,
-		CorrectPractice:  "后续 AI 预审需优先检查并提醒：" + note,
-		ChangeType:       g.RiskLevel,
-		Frequency:        1,
-	})
-	_, _ = s.knowledge.AddRule(&model.KnowledgeRule{
-		Title:      "来自人工评审：" + shortText(note, 24),
-		RuleType:   "rule",
-		Pattern:    note,
-		Suggestion: "评审评审材料时检查：" + note,
-		Enabled:    true,
-	})
-	if s.tplRepo == nil || g.TemplateID == "" {
-		return
+	item := &model.ReviewLearningSuggestion{
+		ReviewID: rv.ID, GuideID: g.ID, TemplateID: g.TemplateID, Status: "pending", RawNote: note,
+		Summary: "AI 已根据评审意见生成待确认的知识沉淀候选。",
+		Issues: []model.ReviewIssue{{
+			Category: category, TriggerCondition: "评审人提交评审意见", ProblemDesc: note,
+			CorrectPractice: "后续 AI 预审需优先检查并提醒：" + note, ChangeType: g.RiskLevel, Frequency: 1,
+		}},
+		Rules: []model.KnowledgeRule{{
+			Title: "来自人工评审：" + shortText(note, 24), RuleType: "rule", Pattern: note,
+			Suggestion: "评审材料时检查：" + note, Enabled: true,
+		}},
+		TemplateSuggestion: "- " + note,
 	}
-	tpl, err := s.tplRepo.Get(g.TemplateID)
-	if err != nil || tpl == nil || strings.Contains(tpl.Content, note) {
-		return
+	s.normalizeLearningSuggestion(item, rv, g)
+	return item
+}
+
+func (s *ReviewService) normalizeLearningSuggestion(item *model.ReviewLearningSuggestion, rv *model.Review, g *model.Guide) {
+	item.ReviewID = rv.ID
+	item.GuideID = g.ID
+	item.TemplateID = g.TemplateID
+	item.Status = "pending"
+	item.RawNote = strings.TrimSpace(item.RawNote)
+	for i := range item.Issues {
+		item.Issues[i].SourceReviewID = rv.ID
+		if item.Issues[i].ChangeType == "" {
+			item.Issues[i].ChangeType = g.RiskLevel
+		}
+		if item.Issues[i].Frequency <= 0 {
+			item.Issues[i].Frequency = 1
+		}
 	}
-	tpl.Content = strings.TrimRight(tpl.Content, "\n") + "\n\n## AI 评审规则沉淀\n- " + note + "\n"
-	tpl.CurrentVersion++
-	tpl.UpdatedAt = now
-	_ = s.tplRepo.Update(tpl)
+	for i := range item.Rules {
+		if item.Rules[i].RuleType == "" {
+			item.Rules[i].RuleType = "rule"
+		}
+		item.Rules[i].Enabled = true
+	}
+}
+
+func extractJSONObject(s string) string {
+	start := strings.Index(s, "{")
+	end := strings.LastIndex(s, "}")
+	if start >= 0 && end > start {
+		return s[start : end+1]
+	}
+	return s
 }
 
 func shortText(s string, limit int) string {

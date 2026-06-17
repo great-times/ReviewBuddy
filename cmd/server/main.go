@@ -57,10 +57,10 @@ func main() {
 	log.Printf("agent adapter: %s", ag.Name())
 
 	// services
-	knowledgeSvc := knowledge.NewService(knowledgeRepo)
+	knowledgeSvc := knowledge.NewService(knowledgeRepo, tplRepo)
 	tplSvc := template.NewService(tplRepo)
 	guideSvc := guide.NewService(guideRepo, tplRepo, ag, knowledgeSvc)
-	reviewSvc := guide.NewReviewService(reviewRepo, guideRepo, tplRepo, userRepo, knowledgeSvc)
+	reviewSvc := guide.NewReviewService(reviewRepo, guideRepo, tplRepo, userRepo, ag, knowledgeSvc)
 	userSvc := user.NewService(userRepo, reviewConfigSvc)
 	authSvc := auth.NewService(userRepo)
 

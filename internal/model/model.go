@@ -98,6 +98,21 @@ type KnowledgeRule struct {
 	UpdatedAt  string `json:"updatedAt"`
 }
 
+type ReviewLearningSuggestion struct {
+	ID                 string          `json:"id"`
+	ReviewID           string          `json:"reviewId"`
+	GuideID            string          `json:"guideId"`
+	TemplateID         string          `json:"templateId"`
+	Status             string          `json:"status"`
+	RawNote            string          `json:"rawNote"`
+	Summary            string          `json:"summary"`
+	Issues             []ReviewIssue   `json:"issues"`
+	Rules              []KnowledgeRule `json:"rules"`
+	TemplateSuggestion string          `json:"templateSuggestion"`
+	CreatedAt          string          `json:"createdAt"`
+	AppliedAt          string          `json:"appliedAt"`
+}
+
 type User struct {
 	ID           string `json:"id"`
 	Username     string `json:"username"`
@@ -178,6 +193,7 @@ type AgentType struct {
 type AIPrecheckResult struct {
 	Findings []PrecheckFinding `json:"findings"`
 	Summary  string            `json:"summary"`
+	ParseOK  bool              `json:"parseOk"`
 }
 
 type PrecheckFinding struct {

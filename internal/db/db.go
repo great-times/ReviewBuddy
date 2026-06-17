@@ -140,6 +140,21 @@ func migrateReviewConfig(conn *sql.DB, now string) error {
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);
+		CREATE TABLE IF NOT EXISTS review_learning_suggestions (
+			id TEXT PRIMARY KEY,
+			review_id TEXT NOT NULL DEFAULT '',
+			guide_id TEXT NOT NULL DEFAULT '',
+			template_id TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT 'pending',
+			raw_note TEXT NOT NULL DEFAULT '',
+			summary TEXT NOT NULL DEFAULT '',
+			issues TEXT NOT NULL DEFAULT '[]',
+			rules TEXT NOT NULL DEFAULT '[]',
+			template_suggestion TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			applied_at TEXT
+		);
+		CREATE INDEX IF NOT EXISTS idx_learning_suggestions_status ON review_learning_suggestions(status);
 	`)
 	if err != nil {
 		return err

@@ -1,6 +1,7 @@
 package knowledge
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -10,9 +11,14 @@ import (
 	"reviewbuddy/internal/repo"
 )
 
-type Service struct{ repo *repo.KnowledgeRepo }
+type Service struct {
+	repo    *repo.KnowledgeRepo
+	tplRepo *repo.TemplateRepo
+}
 
-func NewService(r *repo.KnowledgeRepo) *Service { return &Service{repo: r} }
+func NewService(r *repo.KnowledgeRepo, tpl *repo.TemplateRepo) *Service {
+	return &Service{repo: r, tplRepo: tpl}
+}
 
 func (s *Service) ListIssues() ([]model.ReviewIssue, error) { return s.repo.ListIssues() }
 
@@ -42,6 +48,85 @@ func (s *Service) AddRule(k *model.KnowledgeRule) (*model.KnowledgeRule, error) 
 		return nil, err
 	}
 	return k, nil
+}
+
+func (s *Service) AddLearningSuggestion(item *model.ReviewLearningSuggestion) (*model.ReviewLearningSuggestion, error) {
+	item.ID = uuid.NewString()
+	if item.Status == "" {
+		item.Status = "pending"
+	}
+	item.CreatedAt = time.Now().Format(time.RFC3339)
+	if item.Issues == nil {
+		item.Issues = []model.ReviewIssue{}
+	}
+	if item.Rules == nil {
+		item.Rules = []model.KnowledgeRule{}
+	}
+	if err := s.repo.AddLearningSuggestion(item); err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
+func (s *Service) ListLearningSuggestions(status string) ([]model.ReviewLearningSuggestion, error) {
+	return s.repo.ListLearningSuggestions(status)
+}
+
+func (s *Service) ApplyLearningSuggestion(id string) (*model.ReviewLearningSuggestion, error) {
+	item, err := s.repo.GetLearningSuggestion(id)
+	if err != nil || item == nil {
+		return item, err
+	}
+	if item.Status == "applied" {
+		return item, nil
+	}
+	now := time.Now().Format(time.RFC3339)
+	for i := range item.Issues {
+		issue := item.Issues[i]
+		issue.SourceReviewID = item.ReviewID
+		issue.ID = ""
+		issue.CreatedAt = ""
+		if _, err := s.AddIssue(&issue); err != nil {
+			return nil, err
+		}
+	}
+	for i := range item.Rules {
+		rule := item.Rules[i]
+		rule.ID = ""
+		rule.CreatedAt = ""
+		rule.UpdatedAt = ""
+		if _, err := s.AddRule(&rule); err != nil {
+			return nil, err
+		}
+	}
+	if s.tplRepo != nil && item.TemplateID != "" && strings.TrimSpace(item.TemplateSuggestion) != "" {
+		tpl, err := s.tplRepo.Get(item.TemplateID)
+		if err != nil {
+			return nil, err
+		}
+		if tpl == nil {
+			return nil, errors.New("template not found")
+		}
+		addition := "\n\n## 评审规则沉淀\n" + strings.TrimSpace(item.TemplateSuggestion) + "\n"
+		if !strings.Contains(tpl.Content, strings.TrimSpace(item.TemplateSuggestion)) {
+			tpl.Content = strings.TrimRight(tpl.Content, "\n") + addition
+			tpl.CurrentVersion++
+			tpl.UpdatedAt = now
+			if err := s.tplRepo.Update(tpl); err != nil {
+				return nil, err
+			}
+			_ = s.tplRepo.AddVersion(&model.TemplateVersion{
+				ID: uuid.NewString(), TemplateID: tpl.ID, Version: tpl.CurrentVersion, Content: tpl.Content,
+				ChangeNote: "应用 AI 评审沉淀建议", CreatedBy: "AI", CreatedAt: now,
+			})
+		}
+	}
+	item.Status = "applied"
+	item.AppliedAt = now
+	if err := s.repo.MarkLearningSuggestionApplied(id, now); err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 // Recall 召回与上下文相关的历史问题与规则，组装成可注入 Prompt 的知识块。
