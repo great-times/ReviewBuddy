@@ -20,6 +20,8 @@ func (h *ReviewConfigHandler) RegisterReadOnly(r *gin.RouterGroup) {
 	r.GET("/review-domains", h.listDomains)
 	r.GET("/review-domains/:id/role-users", h.listDomainRoleUsers)
 	r.GET("/review-scenarios", h.listScenarios)
+	r.GET("/me/domains", h.myDomains)
+	r.GET("/users/:id/domains", h.userDomains)
 }
 
 func (h *ReviewConfigHandler) RegisterAdmin(r *gin.RouterGroup) {
@@ -30,6 +32,7 @@ func (h *ReviewConfigHandler) RegisterAdmin(r *gin.RouterGroup) {
 	r.PUT("/review-domains/:id", h.updateDomain)
 	r.DELETE("/review-domains/:id", h.deleteDomain)
 	r.PUT("/review-domains/:id/role-users/:roleKey", h.saveDomainRoleUsers)
+	r.PUT("/users/:id/domains", h.saveUserDomains)
 	r.POST("/review-scenarios", h.createScenario)
 	r.PUT("/review-scenarios/:id", h.updateScenario)
 	r.DELETE("/review-scenarios/:id", h.deleteScenario)
@@ -143,6 +146,44 @@ func (h *ReviewConfigHandler) saveDomainRoleUsers(c *gin.Context) {
 	in.DomainID = c.Param("id")
 	in.RoleKey = c.Param("roleKey")
 	item, err := h.svc.SaveDomainRoleUsers(&in)
+	if err != nil {
+		badRequest(c, err)
+		return
+	}
+	ok(c, item)
+}
+
+func (h *ReviewConfigHandler) myDomains(c *gin.Context) {
+	u := CurrentUser(c)
+	if u == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "请先登录"})
+		return
+	}
+	item, err := h.svc.ListUserDomains(u.ID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	ok(c, item)
+}
+
+func (h *ReviewConfigHandler) userDomains(c *gin.Context) {
+	item, err := h.svc.ListUserDomains(c.Param("id"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	ok(c, item)
+}
+
+func (h *ReviewConfigHandler) saveUserDomains(c *gin.Context) {
+	var in model.UserDomains
+	if err := c.ShouldBindJSON(&in); err != nil {
+		badRequest(c, err)
+		return
+	}
+	in.UserID = c.Param("id")
+	item, err := h.svc.SaveUserDomains(&in)
 	if err != nil {
 		badRequest(c, err)
 		return

@@ -131,6 +131,11 @@ type DomainRoleUsers struct {
 	UserIDs  []string `json:"userIds"`
 }
 
+type UserDomains struct {
+	UserID    string   `json:"userId"`
+	DomainIDs []string `json:"domainIds"`
+}
+
 type ReviewScenario struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`

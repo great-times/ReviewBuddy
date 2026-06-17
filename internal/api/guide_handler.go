@@ -55,6 +55,9 @@ func (h *GuideHandler) create(c *gin.Context) {
 		badRequest(c, err)
 		return
 	}
+	if u := CurrentUser(c); u != nil {
+		in.CreatedBy = u.Username
+	}
 	g, err := h.svc.Create(&in)
 	if err != nil {
 		fail(c, err)

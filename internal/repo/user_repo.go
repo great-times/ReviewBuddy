@@ -47,6 +47,14 @@ func (r *UserRepo) Delete(id string) error {
 	if err != nil {
 		return err
 	}
+	_, err = r.db.Exec(`DELETE FROM user_domains WHERE user_id=?`, id)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(`DELETE FROM domain_role_users WHERE user_id=?`, id)
+	if err != nil {
+		return err
+	}
 	_, err = r.db.Exec(`DELETE FROM users WHERE id=?`, id)
 	return err
 }

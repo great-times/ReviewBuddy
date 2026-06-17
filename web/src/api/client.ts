@@ -54,6 +54,7 @@ export interface Guide {
   status: string;
   riskLevel: string;
   currentVersion: number;
+  createdBy: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,6 +78,11 @@ export interface User {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface UserDomains {
+  userId: string;
+  domainIds: string[];
 }
 
 export interface ReviewRole {
@@ -205,6 +211,10 @@ export const api = {
     http.get<{ data: DomainRoleUsers[] }>(`/review-domains/${domainId}/role-users`).then((r) => r.data.data),
   updateDomainRoleUsers: (domainId: string, roleKey: string, userIds: string[]) =>
     http.put<{ data: DomainRoleUsers }>(`/review-domains/${domainId}/role-users/${roleKey}`, { userIds }).then((r) => r.data.data),
+  getMyDomains: () => http.get<{ data: UserDomains }>('/me/domains').then((r) => r.data.data),
+  getUserDomains: (userId: string) => http.get<{ data: UserDomains }>(`/users/${userId}/domains`).then((r) => r.data.data),
+  updateUserDomains: (userId: string, domainIds: string[]) =>
+    http.put<{ data: UserDomains }>(`/users/${userId}/domains`, { domainIds }).then((r) => r.data.data),
 
   listReviewScenarios: () => http.get<{ data: ReviewScenario[] }>('/review-scenarios').then((r) => r.data.data),
   createReviewScenario: (scenario: Partial<ReviewScenario>) =>
@@ -219,7 +229,7 @@ export const api = {
   checkAgentHealth: () => http.post<{ data: { healthy: boolean; message?: string; error?: string } }>('/agent/health').then((r) => r.data.data),
 };
 
-// SSE 通用流式读取器：自动带鉴权头，按 event 分发到对应回调
+// SSE 流式读取器：自动带鉴权头，按 event 分发到对应回调
 type SSEHandlers = Record<string, (data: string) => void>;
 
 async function streamSSE(url: string, body: Record<string, unknown>, handlers: SSEHandlers) {

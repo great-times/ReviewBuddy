@@ -97,6 +97,12 @@ func migrateReviewConfig(conn *sql.DB, now string) error {
 			PRIMARY KEY (domain_id, role_key, user_id)
 		);
 		CREATE INDEX IF NOT EXISTS idx_domain_role_users_domain ON domain_role_users(domain_id);
+		CREATE TABLE IF NOT EXISTS user_domains (
+			user_id TEXT NOT NULL,
+			domain_id TEXT NOT NULL,
+			PRIMARY KEY (user_id, domain_id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_user_domains_domain ON user_domains(domain_id);
 		CREATE TABLE IF NOT EXISTS review_scenarios (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL UNIQUE,
@@ -132,7 +138,7 @@ func migrateReviewConfig(conn *sql.DB, now string) error {
 	}
 	if _, err := conn.Exec(`
 		INSERT INTO review_domains (id,name,description,created_at,updated_at)
-		SELECT 'default', '默认领域', '通用评审领域，可按业务线或系统继续拆分。', ?, ?
+		SELECT 'default', '默认领域', '评审领域，可按业务线或系统继续拆分。', ?, ?
 		WHERE NOT EXISTS (SELECT 1 FROM review_domains WHERE id='default')
 	`, now, now); err != nil {
 		return err

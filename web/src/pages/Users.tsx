@@ -14,6 +14,7 @@ export default function Users() {
   const [domains, setDomains] = useState<ReviewDomain[]>([]);
   const [scenarios, setScenarios] = useState<ReviewScenario[]>([]);
   const [roleUsers, setRoleUsers] = useState<DomainRoleUsers[]>([]);
+  const [userDomains, setUserDomains] = useState<Record<string, string[]>>({});
   const [activeDomainId, setActiveDomainId] = useState('');
   const [loading, setLoading] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -24,7 +25,7 @@ export default function Users() {
   const [editingRole, setEditingRole] = useState<Partial<ReviewRole> | null>(null);
   const [editingDomain, setEditingDomain] = useState<Partial<ReviewDomain> | null>(null);
   const [editingScenario, setEditingScenario] = useState<Partial<ReviewScenario> | null>(null);
-  const [userForm] = Form.useForm<Partial<User>>();
+  const [userForm] = Form.useForm<Partial<User> & { domainIds?: string[] }>();
   const [roleForm] = Form.useForm<Partial<ReviewRole>>();
   const [domainForm] = Form.useForm<Partial<ReviewDomain>>();
   const [scenarioForm] = Form.useForm<Partial<ReviewScenario>>();
@@ -47,6 +48,8 @@ export default function Users() {
       setRoles(r);
       setDomains(d);
       setScenarios(s);
+      const pairs = await Promise.all(u.map(async (item) => [item.id, (await api.getUserDomains(item.id)).domainIds] as const));
+      setUserDomains(Object.fromEntries(pairs));
       const nextDomain = activeDomainId || d[0]?.id || '';
       setActiveDomainId(nextDomain);
       if (nextDomain) setRoleUsers(await api.listDomainRoleUsers(nextDomain));
@@ -75,7 +78,7 @@ export default function Users() {
   const roleTag = (key: string) => <Tag color={systemRoleColors[key] || 'blue'}>{roleName(key)}</Tag>;
 
   const editUser = (u?: User) => {
-    const value = u || { role: 'readonly' as UserRole };
+    const value = u ? { ...u, domainIds: userDomains[u.id] || [] } : { role: 'readonly' as UserRole, domainIds: [] };
     setEditingUser(value);
     userForm.setFieldsValue(value);
     setUserOpen(true);
@@ -84,8 +87,11 @@ export default function Users() {
   const saveUser = async () => {
     const values = await userForm.validateFields();
     try {
-      if (editingUser?.id) await api.updateUser(editingUser.id, { ...editingUser, ...values });
-      else await api.createUser(values);
+      const { domainIds = [], ...userValues } = values;
+      const saved = editingUser?.id
+        ? await api.updateUser(editingUser.id, { ...editingUser, ...userValues })
+        : await api.createUser(userValues);
+      await api.updateUserDomains(saved.id, domainIds);
       message.success('用户已保存');
       setUserOpen(false);
       load();
@@ -192,6 +198,14 @@ export default function Users() {
                     columns={[
                       { title: '姓名', dataIndex: 'username' },
                       { title: '角色', dataIndex: 'role', width: 140, render: roleTag },
+                      {
+                        title: '所属领域',
+                        dataIndex: 'id',
+                        render: (id: string) => {
+                          const names = (userDomains[id] || []).map((domainId) => domains.find((d) => d.id === domainId)?.name || domainId);
+                          return names.length > 0 ? <Space wrap>{names.map((name) => <Tag key={name}>{name}</Tag>)}</Space> : <Typography.Text type="secondary">未分配</Typography.Text>;
+                        },
+                      },
                       {
                         title: '操作',
                         width: 150,
@@ -346,6 +360,9 @@ export default function Users() {
           </Form.Item>
           <Form.Item name="role" label="角色" rules={[{ required: true }]}>
             <Select options={roleOptions} />
+          </Form.Item>
+          <Form.Item name="domainIds" label="所属领域">
+            <Select mode="multiple" options={domains.map((d) => ({ value: d.id, label: d.name }))} />
           </Form.Item>
         </Form>
       </Modal>

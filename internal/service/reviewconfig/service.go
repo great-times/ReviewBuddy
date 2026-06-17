@@ -121,6 +121,23 @@ func (s *Service) SaveDomainRoleUsers(item *model.DomainRoleUsers) (*model.Domai
 	return item, s.repo.SaveDomainRoleUsers(item)
 }
 
+func (s *Service) ListUserDomains(userID string) (*model.UserDomains, error) {
+	if userID == "" {
+		return nil, errors.New("user is required")
+	}
+	return s.repo.ListUserDomains(userID)
+}
+
+func (s *Service) SaveUserDomains(item *model.UserDomains) (*model.UserDomains, error) {
+	if item.UserID == "" {
+		return nil, errors.New("user is required")
+	}
+	if item.DomainIDs == nil {
+		item.DomainIDs = []string{}
+	}
+	return item, s.repo.SaveUserDomains(item)
+}
+
 func (s *Service) ListScenarios() ([]model.ReviewScenario, error) { return s.repo.ListScenarios() }
 
 func (s *Service) SaveScenario(id string, item *model.ReviewScenario) (*model.ReviewScenario, error) {

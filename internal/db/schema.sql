@@ -37,6 +37,13 @@ CREATE TABLE IF NOT EXISTS domain_role_users (
 );
 CREATE INDEX IF NOT EXISTS idx_domain_role_users_domain ON domain_role_users(domain_id);
 
+CREATE TABLE IF NOT EXISTS user_domains (
+    user_id   TEXT NOT NULL,
+    domain_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, domain_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_domains_domain ON user_domains(domain_id);
+
 CREATE TABLE IF NOT EXISTS review_scenarios (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,

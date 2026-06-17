@@ -96,6 +96,9 @@ func (r *ReviewConfigRepo) DeleteDomain(id string) error {
 	if _, err := tx.Exec(`DELETE FROM domain_role_users WHERE domain_id=?`, id); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM user_domains WHERE domain_id=?`, id); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM review_domains WHERE id=?`, id); err != nil {
 		return err
 	}
@@ -139,6 +142,40 @@ func (r *ReviewConfigRepo) SaveDomainRoleUsers(item *model.DomainRoleUsers) erro
 	}
 	for _, userID := range item.UserIDs {
 		if _, err := tx.Exec(`INSERT INTO domain_role_users (domain_id,role_key,user_id) VALUES (?,?,?)`, item.DomainID, item.RoleKey, userID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (r *ReviewConfigRepo) ListUserDomains(userID string) (*model.UserDomains, error) {
+	rows, err := r.db.Query(`SELECT domain_id FROM user_domains WHERE user_id=? ORDER BY domain_id`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := &model.UserDomains{UserID: userID, DomainIDs: []string{}}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out.DomainIDs = append(out.DomainIDs, id)
+	}
+	return out, rows.Err()
+}
+
+func (r *ReviewConfigRepo) SaveUserDomains(item *model.UserDomains) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM user_domains WHERE user_id=?`, item.UserID); err != nil {
+		return err
+	}
+	for _, domainID := range item.DomainIDs {
+		if _, err := tx.Exec(`INSERT INTO user_domains (user_id,domain_id) VALUES (?,?)`, item.UserID, domainID); err != nil {
 			return err
 		}
 	}
