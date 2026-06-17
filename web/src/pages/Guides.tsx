@@ -4,6 +4,7 @@ import { PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api, Guide } from '../api/client';
 import { useAuthStore } from '../store/auth';
+import { canWrite as canUserWrite } from '../utils/roles';
 
 const { Title } = Typography;
 
@@ -24,7 +25,7 @@ export default function Guides() {
   const [list, setList] = useState<Guide[]>([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const canWrite = useAuthStore((s) => s.user?.role !== 'readonly');
+  const canWrite = useAuthStore((s) => canUserWrite(s.user));
 
   const load = () => {
     setLoading(true);

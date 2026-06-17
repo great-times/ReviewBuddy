@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import { api, DomainRoleUsers, ReviewDomain, ReviewRole, ReviewScenario, User, UserRole } from '../api/client';
+import { api, DomainRoleUsers, ReviewDomain, ReviewRole, ReviewScenario, User } from '../api/client';
+import { hasRole, roleColor, userRoles } from '../utils/roles';
 
 const { Title, Paragraph } = Typography;
 
@@ -33,7 +34,7 @@ export default function Users() {
   const roleMeta = useMemo(() => Object.fromEntries(roles.map((r) => [r.key, r])), [roles]);
   const roleOptions = roles.map((r) => ({ value: r.key, label: r.name }));
   const assignableRoles = roles.filter((r) => r.key !== 'admin' && r.key !== 'readonly');
-  const reviewers = users.filter((u) => u.role !== 'readonly');
+  const reviewers = users.filter((u) => userRoles(u).some((role) => role !== 'readonly'));
 
   const load = async () => {
     setLoading(true);
@@ -74,10 +75,11 @@ export default function Users() {
   };
 
   const roleName = (key: string) => roleMeta[key]?.name || systemRoleNames[key] || key;
-  const roleTag = (key: string) => <Tag color={systemRoleColors[key] || 'blue'}>{roleName(key)}</Tag>;
+  const roleTag = (key: string) => <Tag color={systemRoleColors[key] || roleColor(key)}>{roleName(key)}</Tag>;
+  const roleTags = (u: User) => <Space wrap>{userRoles(u).map((role) => roleTag(role))}</Space>;
 
   const editUser = (u?: User) => {
-    const value = u ? { ...u, domainIds: userDomains[u.id] || [] } : { role: 'readonly' as UserRole, domainIds: [] };
+    const value = u ? { ...u, roles: userRoles(u), domainIds: userDomains[u.id] || [] } : { roles: ['readonly'], domainIds: [] };
     setEditingUser(value);
     userForm.setFieldsValue(value);
     setUserOpen(true);
@@ -196,7 +198,7 @@ export default function Users() {
                     pagination={false}
                     columns={[
                       { title: '姓名', dataIndex: 'username' },
-                      { title: '角色', dataIndex: 'role', width: 140, render: roleTag },
+                      { title: '角色', dataIndex: 'roles', width: 220, render: (_, r) => roleTags(r) },
                       {
                         title: '所属领域',
                         dataIndex: 'id',
@@ -299,7 +301,7 @@ export default function Users() {
                               style={{ width: '100%' }}
                               value={saved}
                               placeholder={`选择${r.name}默认人员`}
-                              options={reviewers.filter((u) => u.role === r.key).map((u) => ({ value: u.id, label: u.username }))}
+                              options={reviewers.filter((u) => hasRole(u, r.key)).map((u) => ({ value: u.id, label: u.username }))}
                               onChange={(ids) => saveDomainUsers(r.key, ids)}
                             />
                           );
@@ -357,8 +359,8 @@ export default function Users() {
           <Form.Item name="username" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
             <Input placeholder="如：张三" />
           </Form.Item>
-          <Form.Item name="role" label="角色" rules={[{ required: true }]}>
-            <Select options={roleOptions} />
+          <Form.Item name="roles" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
+            <Select mode="multiple" options={roleOptions} />
           </Form.Item>
           <Form.Item name="domainIds" label="所属领域">
             <Select mode="multiple" options={domains.map((d) => ({ value: d.id, label: d.name }))} />

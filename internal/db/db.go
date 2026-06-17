@@ -53,6 +53,21 @@ func migrate(conn *sql.DB) error {
 	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
 		return err
 	}
+	_, err = conn.Exec(`
+		CREATE TABLE IF NOT EXISTS user_roles (
+			user_id TEXT NOT NULL,
+			role_key TEXT NOT NULL,
+			PRIMARY KEY (user_id, role_key)
+		);
+		CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_key);
+	`)
+	if err != nil {
+		return err
+	}
+	_, err = conn.Exec(`INSERT OR IGNORE INTO user_roles (user_id,role_key) SELECT id,role FROM users WHERE role != ''`)
+	if err != nil {
+		return err
+	}
 	_, err = conn.Exec(`UPDATE reviews SET reviewer_user_id = COALESCE((SELECT id FROM users WHERE users.username = reviews.reviewer), '') WHERE reviewer_user_id = ''`)
 	if err != nil {
 		return err

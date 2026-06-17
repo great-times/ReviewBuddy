@@ -4,6 +4,7 @@ import { FolderAddOutlined, PlusOutlined } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
 import { api, Template, TemplateLibrary } from '../api/client';
 import { useAuthStore } from '../store/auth';
+import { canWrite as canUserWrite } from '../utils/roles';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -16,7 +17,7 @@ export default function Templates() {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<Template> | null>(null);
   const [libraryForm] = Form.useForm<Partial<TemplateLibrary>>();
-  const canWrite = useAuthStore((s) => s.user?.role !== 'readonly');
+  const canWrite = useAuthStore((s) => canUserWrite(s.user));
 
   const selectedLibrary = useMemo(
     () => libraries.find((l) => l.id === selectedLibraryId),

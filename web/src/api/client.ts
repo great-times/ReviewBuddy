@@ -88,6 +88,7 @@ export interface User {
   id: string;
   username: string;
   role: UserRole;
+  roles: UserRole[];
   enabled: boolean;
   createdAt: string;
   updatedAt: string;

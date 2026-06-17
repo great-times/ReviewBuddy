@@ -3,6 +3,7 @@ import { Button, Card, Col, Form, Input, List, Modal, Row, Space, Table, Tag, Ty
 import { CheckOutlined, PlusOutlined, RobotOutlined } from '@ant-design/icons';
 import { api, http, LearningSuggestion } from '../api/client';
 import { useAuthStore } from '../store/auth';
+import { canWrite as canUserWrite } from '../utils/roles';
 
 const { Title, Paragraph } = Typography;
 
@@ -29,7 +30,7 @@ export default function Knowledge() {
   const [suggestions, setSuggestions] = useState<LearningSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
-  const canWrite = useAuthStore((s) => s.user?.role !== 'readonly');
+  const canWrite = useAuthStore((s) => canUserWrite(s.user));
 
   const load = () => {
     http.get('/knowledge/issues').then((r) => setIssues(r.data.data)).catch(() => {});

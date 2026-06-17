@@ -67,6 +67,7 @@ func (s *Service) Register(username, password string) (*LoginResult, error) {
 		Username:     username,
 		PasswordHash: hashPassword(password),
 		Role:         role,
+		Roles:        []string{role},
 		Enabled:      true,
 		CreatedAt:    now,
 		UpdatedAt:    now,
@@ -129,7 +130,7 @@ func (s *Service) DeleteUser(actorID, id string) error {
 	if err != nil {
 		return err
 	}
-	if u.Role == "admin" {
+	if u.HasRole("admin") {
 		n, err := s.users.CountRole("admin")
 		if err != nil {
 			return err

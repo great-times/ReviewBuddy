@@ -25,21 +25,46 @@ func (r *UserRepo) List() ([]model.User, error) {
 			return nil, err
 		}
 		u.Enabled = enabled != 0
+		if err := r.fillRoles(&u); err != nil {
+			return nil, err
+		}
 		out = append(out, u)
 	}
 	return out, rows.Err()
 }
 
 func (r *UserRepo) Create(u *model.User) error {
-	_, err := r.db.Exec(`INSERT INTO users (id,username,password_hash,role,enabled,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`,
-		u.ID, u.Username, u.PasswordHash, u.Role, boolToInt(u.Enabled), u.CreatedAt, u.UpdatedAt)
-	return err
+	normalizeUserRoles(u)
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`INSERT INTO users (id,username,password_hash,role,enabled,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`,
+		u.ID, u.Username, u.PasswordHash, u.Role, boolToInt(u.Enabled), u.CreatedAt, u.UpdatedAt); err != nil {
+		return err
+	}
+	if err := saveUserRolesTx(tx, u.ID, u.Roles); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *UserRepo) Update(u *model.User) error {
-	_, err := r.db.Exec(`UPDATE users SET username=?,role=?,enabled=?,updated_at=? WHERE id=?`,
-		u.Username, u.Role, boolToInt(u.Enabled), u.UpdatedAt, u.ID)
-	return err
+	normalizeUserRoles(u)
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE users SET username=?,role=?,enabled=?,updated_at=? WHERE id=?`,
+		u.Username, u.Role, boolToInt(u.Enabled), u.UpdatedAt, u.ID); err != nil {
+		return err
+	}
+	if err := saveUserRolesTx(tx, u.ID, u.Roles); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *UserRepo) Delete(id string) error {
@@ -52,6 +77,10 @@ func (r *UserRepo) Delete(id string) error {
 		return err
 	}
 	_, err = r.db.Exec(`DELETE FROM domain_role_users WHERE user_id=?`, id)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(`DELETE FROM user_roles WHERE user_id=?`, id)
 	if err != nil {
 		return err
 	}
@@ -75,7 +104,7 @@ func (r *UserRepo) CountPasswordUsers() (int, error) {
 
 func (r *UserRepo) CountRole(role string) (int, error) {
 	var n int
-	err := r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role=?`, role).Scan(&n)
+	err := r.db.QueryRow(`SELECT COUNT(DISTINCT user_id) FROM user_roles WHERE role_key=?`, role).Scan(&n)
 	return n, err
 }
 
@@ -113,5 +142,87 @@ func (r *UserRepo) scanOne(query string, args ...any) (*model.User, error) {
 		return nil, err
 	}
 	u.Enabled = enabled != 0
+	if err := r.fillRoles(&u); err != nil {
+		return nil, err
+	}
 	return &u, nil
+}
+
+func (r *UserRepo) fillRoles(u *model.User) error {
+	rows, err := r.db.Query(`SELECT role_key FROM user_roles WHERE user_id=? ORDER BY role_key`, u.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	roles := []string{}
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			return err
+		}
+		roles = append(roles, role)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(roles) == 0 && u.Role != "" {
+		roles = append(roles, u.Role)
+	}
+	u.Roles = roles
+	u.Role = primaryRole(roles, u.Role)
+	return nil
+}
+
+func saveUserRolesTx(tx *sql.Tx, userID string, roles []string) error {
+	if _, err := tx.Exec(`DELETE FROM user_roles WHERE user_id=?`, userID); err != nil {
+		return err
+	}
+	for _, role := range roles {
+		if _, err := tx.Exec(`INSERT INTO user_roles (user_id,role_key) VALUES (?,?)`, userID, role); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func normalizeUserRoles(u *model.User) {
+	roles := uniqueNonEmpty(u.Roles)
+	if len(roles) == 0 && u.Role != "" {
+		roles = []string{u.Role}
+	}
+	if len(roles) == 0 {
+		roles = []string{"readonly"}
+	}
+	u.Roles = roles
+	u.Role = primaryRole(roles, u.Role)
+}
+
+func uniqueNonEmpty(in []string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, v := range in {
+		if v == "" || seen[v] {
+			continue
+		}
+		seen[v] = true
+		out = append(out, v)
+	}
+	return out
+}
+
+func primaryRole(roles []string, fallback string) string {
+	for _, role := range roles {
+		if role == "admin" {
+			return role
+		}
+	}
+	for _, role := range roles {
+		if role != "readonly" {
+			return role
+		}
+	}
+	if len(roles) > 0 {
+		return roles[0]
+	}
+	return fallback
 }

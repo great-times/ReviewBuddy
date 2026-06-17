@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, DomainRoleUsers, Guide, ImageInput, PrecheckFinding, ReviewCollection, ReviewDomain, ReviewRole, ReviewScenario, User, precheckStream } from '../api/client';
 import { useAuthStore } from '../store/auth';
+import { canWrite as canUserWrite, userRoles } from '../utils/roles';
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -33,7 +34,7 @@ export default function Reviews() {
   const [findings, setFindings] = useState<PrecheckFinding[]>([]);
   const [streamText, setStreamText] = useState('');
   const [streamDone, setStreamDone] = useState(false);
-  const canWrite = useAuthStore((s) => s.user?.role !== 'readonly');
+  const canWrite = useAuthStore((s) => canUserWrite(s.user));
   const streamRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,10 +66,11 @@ export default function Reviews() {
 
   const roleMeta = Object.fromEntries(roles.map((r) => [r.key, r]));
   const roleName = (key: string) => roleMeta[key]?.name || (key === 'admin' ? '管理员' : key === 'readonly' ? '只读' : key);
+  const userRoleLabel = (u: User) => userRoles(u).map(roleName).join(' / ');
   const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
   const reviewerOptions = users
-    .filter((u) => u.role !== 'readonly')
-    .map((u) => ({ value: u.id, label: `${u.username} · ${roleName(u.role)}` }));
+    .filter((u) => userRoles(u).some((role) => role !== 'readonly'))
+    .map((u) => ({ value: u.id, label: `${u.username} · ${userRoleLabel(u)}` }));
 
   const applyDefaults = async (nextDomainId = domainId, nextScenarioId = scenarioId) => {
     if (!nextDomainId || !nextScenarioId) return;

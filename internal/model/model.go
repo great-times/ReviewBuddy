@@ -126,13 +126,49 @@ type ReviewLearningSuggestion struct {
 }
 
 type User struct {
-	ID           string `json:"id"`
-	Username     string `json:"username"`
-	PasswordHash string `json:"-"`
-	Role         string `json:"role"`
-	Enabled      bool   `json:"enabled"`
-	CreatedAt    string `json:"createdAt"`
-	UpdatedAt    string `json:"updatedAt"`
+	ID           string   `json:"id"`
+	Username     string   `json:"username"`
+	PasswordHash string   `json:"-"`
+	Role         string   `json:"role"`
+	Roles        []string `json:"roles"`
+	Enabled      bool     `json:"enabled"`
+	CreatedAt    string   `json:"createdAt"`
+	UpdatedAt    string   `json:"updatedAt"`
+}
+
+func (u *User) RoleList() []string {
+	if u == nil {
+		return nil
+	}
+	if len(u.Roles) > 0 {
+		return u.Roles
+	}
+	if u.Role != "" {
+		return []string{u.Role}
+	}
+	return nil
+}
+
+func (u *User) HasRole(role string) bool {
+	for _, item := range u.RoleList() {
+		if item == role {
+			return true
+		}
+	}
+	return false
+}
+
+func (u *User) ReadOnlyOnly() bool {
+	roles := u.RoleList()
+	if len(roles) == 0 {
+		return false
+	}
+	for _, role := range roles {
+		if role != "readonly" {
+			return false
+		}
+	}
+	return true
 }
 
 type ReviewRole struct {

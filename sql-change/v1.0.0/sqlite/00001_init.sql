@@ -11,6 +11,13 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS user_roles (
+    user_id  TEXT NOT NULL,
+    role_key TEXT NOT NULL,
+    PRIMARY KEY (user_id, role_key)
+);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_key);
+
 CREATE TABLE IF NOT EXISTS review_roles (
     id          TEXT PRIMARY KEY,
     role_key    TEXT NOT NULL UNIQUE,

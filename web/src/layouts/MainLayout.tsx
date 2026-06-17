@@ -16,6 +16,7 @@ import Logo from '../components/Logo';
 import { useAuthStore } from '../store/auth';
 import { useThemeStore } from '../store/theme';
 import { themeList } from '../themes';
+import { hasRole, roleColor, userRoles } from '../utils/roles';
 
 const { Sider, Header, Content } = Layout;
 
@@ -34,8 +35,9 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const { currentTheme, setTheme } = useThemeStore();
   const { user, logout } = useAuthStore();
-  const visibleMenuItems = user?.role === 'admin' ? menuItems : menuItems.filter((m) => m.key !== '/users');
-  const roleLabel = user?.role === 'admin' ? '管理员' : user?.role === 'readonly' ? '只读' : user?.role || '';
+  const visibleMenuItems = hasRole(user, 'admin') ? menuItems : menuItems.filter((m) => m.key !== '/users');
+  const roles = userRoles(user);
+  const roleLabel = roles.length > 0 ? roles.join(' / ') : '';
 
   const selectedKey =
     visibleMenuItems
@@ -77,7 +79,7 @@ export default function MainLayout() {
               menu={{
                 items: [
                   { key: 'name', label: <Typography.Text type="secondary">{user.username}</Typography.Text>, disabled: true, icon: <UserOutlined /> },
-                  { key: 'role', label: <Tag color={user.role === 'admin' ? 'red' : user.role === 'readonly' ? 'default' : 'blue'}>{roleLabel}</Tag>, disabled: true },
+                  { key: 'role', label: <span>{roles.map((role) => <Tag key={role} color={roleColor(role)}>{role}</Tag>)}</span>, disabled: true },
                   { type: 'divider' },
                   { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
                 ],
@@ -89,7 +91,7 @@ export default function MainLayout() {
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-primary)' }}>
                 <UserOutlined />
                 <span>{user.username}</span>
-                <Tag color={user.role === 'admin' ? 'red' : user.role === 'readonly' ? 'default' : 'blue'} style={{ marginInlineEnd: 0 }}>{roleLabel}</Tag>
+                <Tag color={hasRole(user, 'admin') ? 'red' : roles.every((role) => role === 'readonly') ? 'default' : 'blue'} style={{ marginInlineEnd: 0 }}>{roleLabel}</Tag>
               </span>
             </Dropdown>
           )}

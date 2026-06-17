@@ -4,6 +4,7 @@ import { Spin } from 'antd';
 import MainLayout from './layouts/MainLayout';
 import AuthPage from './pages/Auth';
 import { useAuthStore } from './store/auth';
+import { canWrite, hasRole } from './utils/roles';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Templates = lazy(() => import('./pages/Templates'));
@@ -38,10 +39,10 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="templates" element={<Templates />} />
           <Route path="guides" element={<Guides />} />
-          <Route path="guides/new" element={user.role === 'readonly' ? <Navigate to="/guides" replace /> : <GuideGenerate />} />
+          <Route path="guides/new" element={canWrite(user) ? <GuideGenerate /> : <Navigate to="/guides" replace />} />
           <Route path="reviews" element={<Reviews />} />
           <Route path="knowledge" element={<Knowledge />} />
-          <Route path="users" element={user.role === 'admin' ? <Users /> : <Navigate to="/" replace />} />
+          <Route path="users" element={hasRole(user, 'admin') ? <Users /> : <Navigate to="/" replace />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
