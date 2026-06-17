@@ -22,11 +22,13 @@ CREATE TABLE IF NOT EXISTS review_roles (
 );
 
 CREATE TABLE IF NOT EXISTS review_domains (
-    id          TEXT PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL,
-    updated_at  TEXT NOT NULL
+    id                    TEXT PRIMARY KEY,
+    name                  TEXT NOT NULL UNIQUE,
+    description           TEXT NOT NULL DEFAULT '',
+    mail_subject_template TEXT NOT NULL DEFAULT '',
+    mail_body_template    TEXT NOT NULL DEFAULT '',
+    created_at            TEXT NOT NULL,
+    updated_at            TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS domain_role_users (
@@ -135,6 +137,18 @@ CREATE TABLE IF NOT EXISTS reviews (
     finished_at   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_reviews_gid ON reviews(guide_id);
+
+CREATE TABLE IF NOT EXISTS review_collections (
+    id            TEXT PRIMARY KEY,
+    title         TEXT NOT NULL,
+    domain_id     TEXT NOT NULL DEFAULT '',
+    guide_ids     TEXT NOT NULL DEFAULT '[]',
+    status        TEXT NOT NULL DEFAULT 'pending',
+    decision_note TEXT NOT NULL DEFAULT '',
+    created_by    TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS review_comments (
     id         TEXT PRIMARY KEY,

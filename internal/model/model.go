@@ -63,6 +63,18 @@ type Review struct {
 	FinishedAt     string `json:"finishedAt"`
 }
 
+type ReviewCollection struct {
+	ID           string   `json:"id"`
+	Title        string   `json:"title"`
+	DomainID     string   `json:"domainId"`
+	GuideIDs     []string `json:"guideIds"`
+	Status       string   `json:"status"`
+	DecisionNote string   `json:"decisionNote"`
+	CreatedBy    string   `json:"createdBy"`
+	CreatedAt    string   `json:"createdAt"`
+	UpdatedAt    string   `json:"updatedAt"`
+}
+
 type ReviewComment struct {
 	ID        string `json:"id"`
 	ReviewID  string `json:"reviewId"`
@@ -134,11 +146,13 @@ type ReviewRole struct {
 }
 
 type ReviewDomain struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt"`
+	ID                  string `json:"id"`
+	Name                string `json:"name"`
+	Description         string `json:"description"`
+	MailSubjectTemplate string `json:"mailSubjectTemplate"`
+	MailBodyTemplate    string `json:"mailBodyTemplate"`
+	CreatedAt           string `json:"createdAt"`
+	UpdatedAt           string `json:"updatedAt"`
 }
 
 type DomainRoleUsers struct {

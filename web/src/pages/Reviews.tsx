@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Card, Collapse, Empty, Input, List, Modal, Select, Space, Spin, Table, Tag, Typography, Upload, message } from 'antd';
 import type { UploadFile } from 'antd';
-import { PictureOutlined, RobotOutlined, UserAddOutlined } from '@ant-design/icons';
+import { DownloadOutlined, MailOutlined, PictureOutlined, RobotOutlined, UserAddOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { api, DomainRoleUsers, Guide, ImageInput, PrecheckFinding, ReviewDomain, ReviewRole, ReviewScenario, User, precheckStream } from '../api/client';
+import { api, DomainRoleUsers, Guide, ImageInput, PrecheckFinding, ReviewCollection, ReviewDomain, ReviewRole, ReviewScenario, User, precheckStream } from '../api/client';
 import { useAuthStore } from '../store/auth';
 
 const { Title } = Typography;
@@ -12,8 +12,12 @@ const { TextArea } = Input;
 
 export default function Reviews() {
   const [guides, setGuides] = useState<Guide[]>([]);
+  const [collections, setCollections] = useState<ReviewCollection[]>([]);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState<Guide | null>(null);
+  const [selectedGuideIds, setSelectedGuideIds] = useState<string[]>([]);
+  const [collectionOpen, setCollectionOpen] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<Partial<ReviewCollection> | null>(null);
   const [note, setNote] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<ReviewRole[]>([]);
@@ -39,6 +43,7 @@ export default function Reviews() {
   const load = () => {
     setLoading(true);
     api.listGuides().then((g) => setGuides(g.filter((x) => x.status === 'reviewing' || x.status === 'draft'))).catch((e) => message.error(e.message)).finally(() => setLoading(false));
+    api.listReviewCollections().then(setCollections).catch(() => {});
   };
   useEffect(() => {
     load();
@@ -172,15 +177,73 @@ export default function Reviews() {
     }
   };
 
+  const openCollection = (item?: ReviewCollection) => {
+    setEditingCollection(item || {
+      title: `评审集合 ${new Date().toLocaleDateString()}`,
+      domainId: domainId || domains[0]?.id || 'default',
+      guideIds: selectedGuideIds,
+      status: 'pending',
+      decisionNote: '',
+    });
+    setCollectionOpen(true);
+  };
+
+  const saveCollection = async () => {
+    if (!editingCollection?.title) return message.warning('请填写集合标题');
+    if (!editingCollection.domainId) return message.warning('请选择领域');
+    if (!editingCollection.guideIds?.length) return message.warning('请选择评审材料');
+    try {
+      if (editingCollection.id) await api.updateReviewCollection(editingCollection.id, editingCollection);
+      else await api.createReviewCollection(editingCollection);
+      message.success('评审集合已保存');
+      setCollectionOpen(false);
+      setSelectedGuideIds([]);
+      load();
+    } catch (e: any) {
+      message.error(e.message);
+    }
+  };
+
+  const exportCollection = async (item: ReviewCollection) => {
+    try {
+      const resp = await api.exportReviewCollectionEML(item.id);
+      const blob = new Blob([resp.data], { type: 'message/rfc822' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${item.title}.eml`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      message.error(e.message);
+    }
+  };
+
+  const statusOptions = [
+    { value: 'pending', label: '待确认' },
+    { value: 'approved', label: '通过' },
+    { value: 'rejected', label: '驳回' },
+    { value: 'follow_up', label: '待跟进' },
+  ];
+
   return (
     <div>
       <Title level={3} style={{ color: 'var(--text-primary)' }}>评审工作台</Title>
       <Card style={{ background: 'var(--bg-container)', borderColor: 'var(--border-color)' }}>
+        {canWrite && (
+          <Space style={{ marginBottom: 12 }} wrap>
+            <Button type="primary" icon={<MailOutlined />} disabled={selectedGuideIds.length === 0} onClick={() => openCollection()}>
+              创建评审集合
+            </Button>
+            <Typography.Text type="secondary">已选择 {selectedGuideIds.length} 个材料</Typography.Text>
+          </Space>
+        )}
         <Table
           rowKey="id"
           loading={loading}
           dataSource={guides}
           pagination={false}
+          rowSelection={canWrite ? { selectedRowKeys: selectedGuideIds, onChange: (keys) => setSelectedGuideIds(keys as string[]) } : undefined}
           locale={{ emptyText: <Empty description="暂无待评审的材料" /> }}
           columns={[
             { title: '标题', dataIndex: 'title' },
@@ -188,6 +251,26 @@ export default function Reviews() {
             { title: '风险', dataIndex: 'riskLevel', width: 90 },
             { title: '操作', width: 100, render: (_, r) => <Button size="small" type={canWrite ? 'primary' : 'default'} onClick={() => openReview(r)}>{canWrite ? '评审' : '查看'}</Button> },
           ]}
+        />
+      </Card>
+
+      <Card title="评审集合" style={{ background: 'var(--bg-container)', borderColor: 'var(--border-color)', marginTop: 16 }}>
+        <List
+          dataSource={collections}
+          locale={{ emptyText: '暂无评审集合' }}
+          renderItem={(item) => (
+            <List.Item
+              actions={[
+                <Button key="edit" size="small" onClick={() => openCollection(item)}>编辑</Button>,
+                <Button key="export" size="small" icon={<DownloadOutlined />} onClick={() => exportCollection(item)}>导出纪要</Button>,
+              ]}
+            >
+              <List.Item.Meta
+                title={<Space><span>{item.title}</span><Tag>{statusOptions.find((s) => s.value === item.status)?.label || item.status}</Tag></Space>}
+                description={`${domains.find((d) => d.id === item.domainId)?.name || item.domainId || '默认领域'} · 材料 ${item.guideIds.length} 个 · ${item.decisionNote || '未填写统一意见'}`}
+              />
+            </List.Item>
+          )}
         />
       </Card>
 
@@ -323,6 +406,52 @@ export default function Reviews() {
             <TextArea placeholder="评审意见 / 决定说明" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
           </Space>
         )}
+      </Modal>
+
+      <Modal
+        title={editingCollection?.id ? '编辑评审集合' : '创建评审集合'}
+        open={collectionOpen}
+        onCancel={() => setCollectionOpen(false)}
+        onOk={saveCollection}
+        width={760}
+        okText="保存"
+        cancelText="取消"
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Input
+            placeholder="集合标题，如：订单中心上线评审会"
+            value={editingCollection?.title}
+            onChange={(e) => setEditingCollection({ ...editingCollection, title: e.target.value })}
+          />
+          <Select
+            style={{ width: '100%' }}
+            placeholder="选择领域，导出时按领域邮件模板生成纪要"
+            value={editingCollection?.domainId || undefined}
+            options={domains.map((d) => ({ value: d.id, label: d.name }))}
+            onChange={(nextDomainId) => setEditingCollection({ ...editingCollection, domainId: nextDomainId })}
+          />
+          <Select
+            mode="multiple"
+            style={{ width: '100%' }}
+            placeholder="选择评审材料"
+            value={editingCollection?.guideIds || []}
+            options={guides.map((g) => ({ value: g.id, label: `${g.title} · ${g.riskLevel}` }))}
+            onChange={(guideIds) => setEditingCollection({ ...editingCollection, guideIds })}
+          />
+          <Select
+            style={{ width: '100%' }}
+            placeholder="评审状态"
+            value={editingCollection?.status || 'pending'}
+            options={statusOptions}
+            onChange={(status) => setEditingCollection({ ...editingCollection, status })}
+          />
+          <TextArea
+            rows={5}
+            placeholder="统一评审意见 / 纪要摘要 / 后续动作"
+            value={editingCollection?.decisionNote}
+            onChange={(e) => setEditingCollection({ ...editingCollection, decisionNote: e.target.value })}
+          />
+        </Space>
       </Modal>
     </div>
   );

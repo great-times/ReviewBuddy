@@ -390,6 +390,26 @@ export default function Users() {
           <Form.Item name="description" label="说明">
             <Input.TextArea rows={3} />
           </Form.Item>
+          <Form.Item name="mailSubjectTemplate" label="邮件主题模板">
+            <Input placeholder="评审纪要 - {{collectionTitle}}" />
+          </Form.Item>
+          <Form.Item name="mailBodyTemplate" label="邮件正文模板">
+            <Input.TextArea
+              rows={10}
+              placeholder={`<html><body>
+<h2>评审纪要：{{collectionTitle}}</h2>
+<p><b>领域：</b>{{domainName}}</p>
+<p><b>评审状态：</b>{{status}}</p>
+<h3>统一评审意见</h3>
+<p>{{decisionNote}}</p>
+<h3>评审材料清单</h3>
+{{materialsTable}}
+</body></html>`}
+            />
+          </Form.Item>
+          <Paragraph type="secondary" style={{ marginTop: -8 }}>
+            可用变量：{'{{collectionTitle}}'}、{'{{domainName}}'}、{'{{status}}'}、{'{{decisionNote}}'}、{'{{materialsTable}}'}、{'{{materialsList}}'}、{'{{createdBy}}'}、{'{{updatedAt}}'}。
+          </Paragraph>
         </Form>
       </Modal>
 

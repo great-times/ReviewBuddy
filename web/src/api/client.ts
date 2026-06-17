@@ -70,6 +70,18 @@ export interface Review {
   finishedAt: string;
 }
 
+export interface ReviewCollection {
+  id: string;
+  title: string;
+  domainId: string;
+  guideIds: string[];
+  status: string;
+  decisionNote: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type UserRole = string;
 
 export interface User {
@@ -104,6 +116,8 @@ export interface ReviewDomain {
   id: string;
   name: string;
   description: string;
+  mailSubjectTemplate: string;
+  mailBodyTemplate: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -242,6 +256,12 @@ export const api = {
     http.post<{ data: Review }>(`/guides/${guideId}/reviews`, { reviewerUserId, reviewer }).then((r) => r.data.data),
   decideReview: (rid: string, status: string, note: string) =>
     http.post<{ data: Review }>(`/reviews/${rid}/decision`, { status, note }).then((r) => r.data.data),
+  listReviewCollections: () => http.get<{ data: ReviewCollection[] }>('/review-collections').then((r) => r.data.data),
+  createReviewCollection: (payload: Partial<ReviewCollection>) =>
+    http.post<{ data: ReviewCollection }>('/review-collections', payload).then((r) => r.data.data),
+  updateReviewCollection: (id: string, payload: Partial<ReviewCollection>) =>
+    http.put<{ data: ReviewCollection }>(`/review-collections/${id}`, payload).then((r) => r.data.data),
+  exportReviewCollectionEML: (id: string) => http.get(`/review-collections/${id}/export-eml`, { responseType: 'blob' }),
 
   metrics: () => http.get<{ data: { issueCount: number; ruleCount: number } }>('/metrics/quality').then((r) => r.data.data),
   listLearningSuggestions: (status?: string) =>

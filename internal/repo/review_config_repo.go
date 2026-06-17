@@ -64,7 +64,7 @@ func (r *ReviewConfigRepo) DeleteRole(key string) error {
 }
 
 func (r *ReviewConfigRepo) ListDomains() ([]model.ReviewDomain, error) {
-	rows, err := r.db.Query(`SELECT id,name,description,created_at,updated_at FROM review_domains ORDER BY created_at ASC`)
+	rows, err := r.db.Query(`SELECT id,name,description,mail_subject_template,mail_body_template,created_at,updated_at FROM review_domains ORDER BY created_at ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (r *ReviewConfigRepo) ListDomains() ([]model.ReviewDomain, error) {
 	out := []model.ReviewDomain{}
 	for rows.Next() {
 		var item model.ReviewDomain
-		if err := rows.Scan(&item.ID, &item.Name, &item.Description, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Description, &item.MailSubjectTemplate, &item.MailBodyTemplate, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -80,10 +80,22 @@ func (r *ReviewConfigRepo) ListDomains() ([]model.ReviewDomain, error) {
 	return out, rows.Err()
 }
 
+func (r *ReviewConfigRepo) GetDomain(id string) (*model.ReviewDomain, error) {
+	row := r.db.QueryRow(`SELECT id,name,description,mail_subject_template,mail_body_template,created_at,updated_at FROM review_domains WHERE id=?`, id)
+	var item model.ReviewDomain
+	if err := row.Scan(&item.ID, &item.Name, &item.Description, &item.MailSubjectTemplate, &item.MailBodyTemplate, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &item, nil
+}
+
 func (r *ReviewConfigRepo) SaveDomain(item *model.ReviewDomain) error {
-	_, err := r.db.Exec(`INSERT INTO review_domains (id,name,description,created_at,updated_at) VALUES (?,?,?,?,?)
-		ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,updated_at=excluded.updated_at`,
-		item.ID, item.Name, item.Description, item.CreatedAt, item.UpdatedAt)
+	_, err := r.db.Exec(`INSERT INTO review_domains (id,name,description,mail_subject_template,mail_body_template,created_at,updated_at) VALUES (?,?,?,?,?,?,?)
+		ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,mail_subject_template=excluded.mail_subject_template,mail_body_template=excluded.mail_body_template,updated_at=excluded.updated_at`,
+		item.ID, item.Name, item.Description, item.MailSubjectTemplate, item.MailBodyTemplate, item.CreatedAt, item.UpdatedAt)
 	return err
 }
 

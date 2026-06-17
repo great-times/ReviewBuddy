@@ -97,6 +97,12 @@ func (s *Service) SaveDomain(id string, item *model.ReviewDomain) (*model.Review
 	if item.CreatedAt == "" {
 		item.CreatedAt = now
 	}
+	if strings.TrimSpace(item.MailSubjectTemplate) == "" {
+		item.MailSubjectTemplate = defaultMailSubjectTemplate()
+	}
+	if strings.TrimSpace(item.MailBodyTemplate) == "" {
+		item.MailBodyTemplate = defaultMailBodyTemplate()
+	}
 	if err := s.repo.SaveDomain(item); err != nil {
 		return nil, err
 	}
@@ -186,4 +192,21 @@ func (s *Service) DeleteScenario(id string) error {
 		return errors.New("default scenario cannot be deleted")
 	}
 	return s.repo.DeleteScenario(id)
+}
+
+func defaultMailSubjectTemplate() string {
+	return `评审纪要 - {{collectionTitle}}`
+}
+
+func defaultMailBodyTemplate() string {
+	return `<html><body>
+<h2>评审纪要：{{collectionTitle}}</h2>
+<p><b>领域：</b>{{domainName}}</p>
+<p><b>评审状态：</b>{{status}}</p>
+<h3>统一评审意见</h3>
+<p>{{decisionNote}}</p>
+<h3>评审材料清单</h3>
+{{materialsTable}}
+<p>请各责任人根据评审意见完成后续动作。</p>
+</body></html>`
 }

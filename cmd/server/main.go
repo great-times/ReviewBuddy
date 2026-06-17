@@ -43,6 +43,7 @@ func main() {
 	tplRepo := repo.NewTemplateRepo(database)
 	guideRepo := repo.NewGuideRepo(database)
 	reviewRepo := repo.NewReviewRepo(database)
+	reviewCollectionRepo := repo.NewReviewCollectionRepo(database)
 	knowledgeRepo := repo.NewKnowledgeRepo(database)
 	userRepo := repo.NewUserRepo(database)
 	settingsRepo := repo.NewSettingsRepo(database)
@@ -61,6 +62,7 @@ func main() {
 	tplSvc := template.NewService(tplRepo)
 	guideSvc := guide.NewService(guideRepo, tplRepo, ag, knowledgeSvc)
 	reviewSvc := guide.NewReviewService(reviewRepo, guideRepo, tplRepo, userRepo, ag, knowledgeSvc)
+	reviewCollectionSvc := guide.NewCollectionService(reviewCollectionRepo, guideRepo, reviewRepo, reviewConfigRepo)
 	userSvc := user.NewService(userRepo, reviewConfigSvc)
 	authSvc := auth.NewService(userRepo)
 
@@ -90,6 +92,7 @@ func main() {
 	api.NewTemplateHandler(tplSvc).Register(protected)
 	api.NewGuideHandler(guideSvc).Register(protected)
 	api.NewReviewHandler(reviewSvc).Register(protected)
+	api.NewReviewCollectionHandler(reviewCollectionSvc).Register(protected)
 	api.NewKnowledgeHandler(knowledgeSvc).Register(protected)
 	api.NewSettingsHandler(settingsSvc).Register(protected)
 	api.NewDashboardHandler(dashboardSvc).Register(protected)

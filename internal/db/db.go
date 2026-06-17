@@ -116,6 +116,8 @@ func migrateReviewConfig(conn *sql.DB, now string) error {
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL UNIQUE,
 			description TEXT NOT NULL DEFAULT '',
+			mail_subject_template TEXT NOT NULL DEFAULT '',
+			mail_body_template TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);
@@ -155,9 +157,29 @@ func migrateReviewConfig(conn *sql.DB, now string) error {
 			applied_at TEXT
 		);
 		CREATE INDEX IF NOT EXISTS idx_learning_suggestions_status ON review_learning_suggestions(status);
+		CREATE TABLE IF NOT EXISTS review_collections (
+			id TEXT PRIMARY KEY,
+			title TEXT NOT NULL,
+			domain_id TEXT NOT NULL DEFAULT '',
+			guide_ids TEXT NOT NULL DEFAULT '[]',
+			status TEXT NOT NULL DEFAULT 'pending',
+			decision_note TEXT NOT NULL DEFAULT '',
+			created_by TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		);
 	`)
 	if err != nil {
 		return err
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE review_domains ADD COLUMN mail_subject_template TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE review_domains ADD COLUMN mail_body_template TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE review_collections ADD COLUMN domain_id TEXT NOT NULL DEFAULT ''`,
+	} {
+		if _, err := conn.Exec(stmt); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			return err
+		}
 	}
 	defaultRoles := []struct {
 		key, name, desc string
@@ -181,10 +203,18 @@ func migrateReviewConfig(conn *sql.DB, now string) error {
 		}
 	}
 	if _, err := conn.Exec(`
-		INSERT INTO review_domains (id,name,description,created_at,updated_at)
-		SELECT 'default', '默认领域', '评审领域，可按业务线或系统继续拆分。', ?, ?
+		INSERT INTO review_domains (id,name,description,mail_subject_template,mail_body_template,created_at,updated_at)
+		SELECT 'default', '默认领域', '评审领域，可按业务线或系统继续拆分。', ?, ?, ?, ?
 		WHERE NOT EXISTS (SELECT 1 FROM review_domains WHERE id='default')
-	`, now, now); err != nil {
+	`, defaultMailSubjectTemplate(), defaultMailBodyTemplate(), now, now); err != nil {
+		return err
+	}
+	if _, err := conn.Exec(`
+		UPDATE review_domains
+		SET mail_subject_template = CASE WHEN mail_subject_template='' THEN ? ELSE mail_subject_template END,
+			mail_body_template = CASE WHEN mail_body_template='' THEN ? ELSE mail_body_template END
+		WHERE id='default'
+	`, defaultMailSubjectTemplate(), defaultMailBodyTemplate()); err != nil {
 		return err
 	}
 	_, err = conn.Exec(`
@@ -193,4 +223,21 @@ func migrateReviewConfig(conn *sql.DB, now string) error {
 		WHERE NOT EXISTS (SELECT 1 FROM review_scenarios WHERE id='standard')
 	`, now, now)
 	return err
+}
+
+func defaultMailSubjectTemplate() string {
+	return `评审纪要 - {{collectionTitle}}`
+}
+
+func defaultMailBodyTemplate() string {
+	return `<html><body>
+<h2>评审纪要：{{collectionTitle}}</h2>
+<p><b>领域：</b>{{domainName}}</p>
+<p><b>评审状态：</b>{{status}}</p>
+<h3>统一评审意见</h3>
+<p>{{decisionNote}}</p>
+<h3>评审材料清单</h3>
+{{materialsTable}}
+<p>请各责任人根据评审意见完成后续动作。</p>
+</body></html>`
 }
