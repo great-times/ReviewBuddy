@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"changebuddy/internal/model"
+	"reviewbuddy/internal/model"
 )
 
 type TemplateRepo struct{ db *sql.DB }

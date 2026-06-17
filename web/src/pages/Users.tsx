@@ -39,7 +39,7 @@ export default function Users() {
     setLoading(true);
     try {
       const [u, r, d, s] = await Promise.all([
-        api.listUsers(),
+        api.listUsersWithDomains(),
         api.listReviewRoles(),
         api.listReviewDomains(),
         api.listReviewScenarios(),
@@ -48,8 +48,7 @@ export default function Users() {
       setRoles(r);
       setDomains(d);
       setScenarios(s);
-      const pairs = await Promise.all(u.map(async (item) => [item.id, (await api.getUserDomains(item.id)).domainIds] as const));
-      setUserDomains(Object.fromEntries(pairs));
+      setUserDomains(Object.fromEntries(u.map((item) => [item.id, item.domainIds || []])));
       const nextDomain = activeDomainId || d[0]?.id || '';
       setActiveDomainId(nextDomain);
       if (nextDomain) setRoleUsers(await api.listDomainRoleUsers(nextDomain));

@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/repo"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/repo"
 )
 
 var roleKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{1,31}$`)
@@ -126,6 +126,22 @@ func (s *Service) ListUserDomains(userID string) (*model.UserDomains, error) {
 		return nil, errors.New("user is required")
 	}
 	return s.repo.ListUserDomains(userID)
+}
+
+func (s *Service) ListUsersWithDomains() ([]model.UserWithDomains, error) {
+	users, err := s.users.List()
+	if err != nil {
+		return nil, err
+	}
+	domains, err := s.repo.ListAllUserDomains()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.UserWithDomains, 0, len(users))
+	for _, u := range users {
+		out = append(out, model.UserWithDomains{User: u, DomainIDs: domains[u.ID]})
+	}
+	return out, nil
 }
 
 func (s *Service) SaveUserDomains(item *model.UserDomains) (*model.UserDomains, error) {

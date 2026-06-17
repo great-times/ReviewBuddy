@@ -49,6 +49,14 @@ func migrate(conn *sql.DB) error {
 	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
 		return err
 	}
+	_, err = conn.Exec(`ALTER TABLE reviews ADD COLUMN reviewer_user_id TEXT NOT NULL DEFAULT ''`)
+	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+		return err
+	}
+	_, err = conn.Exec(`UPDATE reviews SET reviewer_user_id = COALESCE((SELECT id FROM users WHERE users.username = reviews.reviewer), '') WHERE reviewer_user_id = ''`)
+	if err != nil {
+		return err
+	}
 	now := time.Now().Format(time.RFC3339)
 	_, err = conn.Exec(`
 		INSERT INTO template_libraries (id,name,description,created_at,updated_at)
@@ -59,6 +67,27 @@ func migrate(conn *sql.DB) error {
 		return err
 	}
 	_, err = conn.Exec(`UPDATE templates SET library_id='default' WHERE library_id=''`)
+	if err != nil {
+		return err
+	}
+	_, err = conn.Exec(`
+		UPDATE templates
+		SET name = REPLACE(REPLACE(name, '通用系统变更指导书', '标准系统评审材料模板'), '变更指导书', '评审材料'),
+			category = REPLACE(category, '通用', '标准'),
+			description = REPLACE(REPLACE(REPLACE(description, '通用', '标准'), '变更指导书', '评审材料'), '指导书', '材料'),
+			updated_at = ?
+		WHERE name LIKE '%通用%' OR name LIKE '%变更指导书%' OR category LIKE '%通用%' OR description LIKE '%通用%' OR description LIKE '%变更指导书%' OR description LIKE '%指导书%'
+	`, now)
+	if err != nil {
+		return err
+	}
+	_, err = conn.Exec(`
+		UPDATE template_libraries
+		SET name = REPLACE(REPLACE(name, '变更指导模板库', '评审材料模板库'), '变更指导书', '评审材料'),
+			description = REPLACE(REPLACE(description, '变更指导书', '评审材料'), '指导书', '材料'),
+			updated_at = ?
+		WHERE name LIKE '%变更指导%' OR description LIKE '%变更指导书%' OR description LIKE '%指导书%'
+	`, now)
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"changebuddy/pkg/config"
+	"reviewbuddy/pkg/config"
 )
 
 // New 按配置创建适配器。provider 未配置或为 mock，或缺少 base_url 时回退到 Mock。

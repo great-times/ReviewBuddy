@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/service/auth"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/service/auth"
 )
 
 type AuthHandler struct{ svc *auth.Service }

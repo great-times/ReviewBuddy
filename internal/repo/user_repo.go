@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"changebuddy/internal/model"
+	"reviewbuddy/internal/model"
 )
 
 type UserRepo struct{ db *sql.DB }

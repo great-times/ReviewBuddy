@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"changebuddy/internal/model"
+	"reviewbuddy/internal/model"
 )
 
 type ReviewConfigRepo struct{ db *sql.DB }
@@ -161,6 +161,23 @@ func (r *ReviewConfigRepo) ListUserDomains(userID string) (*model.UserDomains, e
 			return nil, err
 		}
 		out.DomainIDs = append(out.DomainIDs, id)
+	}
+	return out, rows.Err()
+}
+
+func (r *ReviewConfigRepo) ListAllUserDomains() (map[string][]string, error) {
+	rows, err := r.db.Query(`SELECT user_id,domain_id FROM user_domains ORDER BY user_id, domain_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string][]string{}
+	for rows.Next() {
+		var userID, domainID string
+		if err := rows.Scan(&userID, &domainID); err != nil {
+			return nil, err
+		}
+		out[userID] = append(out[userID], domainID)
 	}
 	return out, rows.Err()
 }

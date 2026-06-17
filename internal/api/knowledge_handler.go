@@ -3,8 +3,8 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/service/knowledge"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/service/knowledge"
 )
 
 type KnowledgeHandler struct{ svc *knowledge.Service }

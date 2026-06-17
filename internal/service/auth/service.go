@@ -13,8 +13,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/repo"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/repo"
 )
 
 const TokenTTL = 24 * time.Hour * 14

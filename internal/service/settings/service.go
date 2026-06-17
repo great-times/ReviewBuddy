@@ -5,9 +5,9 @@ import (
 	"strings"
 	"sync"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/repo"
-	"changebuddy/pkg/config"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/repo"
+	"reviewbuddy/pkg/config"
 )
 
 const keyAgent = "agent_settings"

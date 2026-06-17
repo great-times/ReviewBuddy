@@ -8,19 +8,20 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	"changebuddy/internal/api"
-	"changebuddy/internal/db"
-	"changebuddy/internal/model"
-	"changebuddy/internal/repo"
-	"changebuddy/internal/service/agent"
-	"changebuddy/internal/service/auth"
-	"changebuddy/internal/service/guide"
-	"changebuddy/internal/service/knowledge"
-	"changebuddy/internal/service/reviewconfig"
-	"changebuddy/internal/service/settings"
-	"changebuddy/internal/service/template"
-	"changebuddy/internal/service/user"
-	"changebuddy/pkg/config"
+	"reviewbuddy/internal/api"
+	"reviewbuddy/internal/db"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/repo"
+	"reviewbuddy/internal/service/agent"
+	"reviewbuddy/internal/service/auth"
+	"reviewbuddy/internal/service/dashboard"
+	"reviewbuddy/internal/service/guide"
+	"reviewbuddy/internal/service/knowledge"
+	"reviewbuddy/internal/service/reviewconfig"
+	"reviewbuddy/internal/service/settings"
+	"reviewbuddy/internal/service/template"
+	"reviewbuddy/internal/service/user"
+	"reviewbuddy/pkg/config"
 )
 
 func main() {
@@ -49,6 +50,7 @@ func main() {
 
 	settingsSvc := settings.NewService(settingsRepo, cfg.Agent)
 	reviewConfigSvc := reviewconfig.NewService(reviewConfigRepo, userRepo)
+	dashboardSvc := dashboard.NewService(tplRepo, guideRepo, reviewRepo, knowledgeRepo, reviewConfigRepo)
 
 	// agent (Hermes / OpenAI 兼容；未配置时回退 mock)
 	ag := agent.NewDynamicAdapter(settingsSvc)
@@ -58,7 +60,7 @@ func main() {
 	knowledgeSvc := knowledge.NewService(knowledgeRepo)
 	tplSvc := template.NewService(tplRepo)
 	guideSvc := guide.NewService(guideRepo, tplRepo, ag, knowledgeSvc)
-	reviewSvc := guide.NewReviewService(reviewRepo, guideRepo, tplRepo, knowledgeSvc)
+	reviewSvc := guide.NewReviewService(reviewRepo, guideRepo, tplRepo, userRepo, knowledgeSvc)
 	userSvc := user.NewService(userRepo, reviewConfigSvc)
 	authSvc := auth.NewService(userRepo)
 
@@ -90,6 +92,7 @@ func main() {
 	api.NewReviewHandler(reviewSvc).Register(protected)
 	api.NewKnowledgeHandler(knowledgeSvc).Register(protected)
 	api.NewSettingsHandler(settingsSvc).Register(protected)
+	api.NewDashboardHandler(dashboardSvc).Register(protected)
 	api.NewUserHandler(userSvc, authSvc).RegisterReadOnly(protected)
 	api.NewReviewConfigHandler(reviewConfigSvc).RegisterReadOnly(protected)
 

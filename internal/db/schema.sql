@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS reviews (
     guide_id      TEXT NOT NULL,
     guide_version INTEGER NOT NULL DEFAULT 1,
     reviewer      TEXT NOT NULL DEFAULT '',
+    reviewer_user_id TEXT NOT NULL DEFAULT '',
     status        TEXT NOT NULL DEFAULT 'pending', -- pending/approved/rejected
     decision_note TEXT NOT NULL DEFAULT '',
     created_at    TEXT NOT NULL,

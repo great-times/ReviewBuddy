@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/service/guide"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/service/guide"
 )
 
 type ReviewHandler struct{ svc *guide.ReviewService }
@@ -32,10 +32,11 @@ func (h *ReviewHandler) listByGuide(c *gin.Context) {
 
 func (h *ReviewHandler) create(c *gin.Context) {
 	var body struct {
-		Reviewer string `json:"reviewer"`
+		Reviewer       string `json:"reviewer"`
+		ReviewerUserID string `json:"reviewerUserId"`
 	}
 	_ = c.ShouldBindJSON(&body)
-	v, err := h.svc.Create(c.Param("id"), body.Reviewer)
+	v, err := h.svc.Create(c.Param("id"), body.ReviewerUserID, body.Reviewer)
 	if err != nil {
 		badRequest(c, err)
 		return

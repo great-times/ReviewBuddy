@@ -3,7 +3,7 @@ package repo
 import (
 	"database/sql"
 
-	"changebuddy/internal/model"
+	"reviewbuddy/internal/model"
 )
 
 type KnowledgeRepo struct{ db *sql.DB }

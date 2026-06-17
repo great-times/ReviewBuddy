@@ -1,4 +1,4 @@
-module changebuddy
+module reviewbuddy
 
 go 1.26
 

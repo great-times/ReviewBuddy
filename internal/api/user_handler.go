@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/service/auth"
-	"changebuddy/internal/service/user"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/service/auth"
+	"reviewbuddy/internal/service/user"
 )
 
 type UserHandler struct {

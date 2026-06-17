@@ -52,14 +52,15 @@ type Guide struct {
 }
 
 type Review struct {
-	ID           string `json:"id"`
-	GuideID      string `json:"guideId"`
-	GuideVersion int    `json:"guideVersion"`
-	Reviewer     string `json:"reviewer"`
-	Status       string `json:"status"`
-	DecisionNote string `json:"decisionNote"`
-	CreatedAt    string `json:"createdAt"`
-	FinishedAt   string `json:"finishedAt"`
+	ID             string `json:"id"`
+	GuideID        string `json:"guideId"`
+	GuideVersion   int    `json:"guideVersion"`
+	Reviewer       string `json:"reviewer"`
+	ReviewerUserID string `json:"reviewerUserId"`
+	Status         string `json:"status"`
+	DecisionNote   string `json:"decisionNote"`
+	CreatedAt      string `json:"createdAt"`
+	FinishedAt     string `json:"finishedAt"`
 }
 
 type ReviewComment struct {
@@ -136,6 +137,11 @@ type UserDomains struct {
 	DomainIDs []string `json:"domainIds"`
 }
 
+type UserWithDomains struct {
+	User
+	DomainIDs []string `json:"domainIds"`
+}
+
 type ReviewScenario struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
@@ -180,4 +186,14 @@ type PrecheckFinding struct {
 	Excerpt    string `json:"excerpt"`
 	Problem    string `json:"problem"`
 	Suggestion string `json:"suggestion"`
+}
+
+type DashboardSummary struct {
+	Templates   []Template     `json:"templates"`
+	Guides      []Guide        `json:"guides"`
+	Reviews     []Review       `json:"reviews"`
+	Domains     []ReviewDomain `json:"domains"`
+	MyDomainIDs []string       `json:"myDomainIds"`
+	IssueCount  int            `json:"issueCount"`
+	RuleCount   int            `json:"ruleCount"`
 }

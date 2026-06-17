@@ -35,21 +35,18 @@ export default function Dashboard() {
     const load = async () => {
       setLoading(true);
       try {
-        const [tpls, gs, ds, myDs, metrics] = await Promise.all([
-          api.listTemplates(),
-          api.listGuides(),
-          api.listReviewDomains(),
-          api.getMyDomains(),
-          api.metrics(),
-        ]);
-        const pairs = await Promise.all(gs.map(async (g) => [g.id, await api.listReviews(g.id)] as const));
-        setTemplates(tpls);
-        setGuides(gs);
-        setDomains(ds);
-        setMyDomainIds(myDs.domainIds || []);
-        setReviewsByGuide(Object.fromEntries(pairs));
-        setIssues(metrics.issueCount);
-        setRules(metrics.ruleCount);
+        const summary = await api.dashboard();
+        setTemplates(summary.templates || []);
+        setGuides(summary.guides || []);
+        setDomains(summary.domains || []);
+        setMyDomainIds(summary.myDomainIds || []);
+        const grouped = (summary.reviews || []).reduce<Record<string, Review[]>>((acc, review) => {
+          acc[review.guideId] = [...(acc[review.guideId] || []), review];
+          return acc;
+        }, {});
+        setReviewsByGuide(grouped);
+        setIssues(summary.issueCount);
+        setRules(summary.ruleCount);
       } catch (e: any) {
         message.error(e.message);
       } finally {
@@ -67,7 +64,7 @@ export default function Dashboard() {
   const myReviewTasks = useMemo<ReviewTask[]>(() => {
     if (!user) return [];
     return guides.flatMap((guide) => (reviewsByGuide[guide.id] || [])
-      .filter((review) => review.reviewer === user.username && review.status === 'pending')
+      .filter((review) => (review.reviewerUserId ? review.reviewerUserId === user.id : review.reviewer === user.username) && review.status === 'pending')
       .map((review) => ({ guide, review })));
   }, [guides, reviewsByGuide, user]);
 

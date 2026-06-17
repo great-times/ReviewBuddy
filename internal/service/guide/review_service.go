@@ -7,27 +7,28 @@ import (
 
 	"github.com/google/uuid"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/repo"
-	"changebuddy/internal/service/knowledge"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/repo"
+	"reviewbuddy/internal/service/knowledge"
 )
 
 type ReviewService struct {
 	repo      *repo.ReviewRepo
 	guideRepo *repo.GuideRepo
 	tplRepo   *repo.TemplateRepo
+	userRepo  *repo.UserRepo
 	knowledge *knowledge.Service
 }
 
-func NewReviewService(r *repo.ReviewRepo, g *repo.GuideRepo, tpl *repo.TemplateRepo, kn *knowledge.Service) *ReviewService {
-	return &ReviewService{repo: r, guideRepo: g, tplRepo: tpl, knowledge: kn}
+func NewReviewService(r *repo.ReviewRepo, g *repo.GuideRepo, tpl *repo.TemplateRepo, users *repo.UserRepo, kn *knowledge.Service) *ReviewService {
+	return &ReviewService{repo: r, guideRepo: g, tplRepo: tpl, userRepo: users, knowledge: kn}
 }
 
 func (s *ReviewService) ListByGuide(guideID string) ([]model.Review, error) {
 	return s.repo.ListByGuide(guideID)
 }
 
-func (s *ReviewService) Create(guideID, reviewer string) (*model.Review, error) {
+func (s *ReviewService) Create(guideID, reviewerUserID, reviewer string) (*model.Review, error) {
 	g, err := s.guideRepo.Get(guideID)
 	if err != nil {
 		return nil, err
@@ -35,9 +36,19 @@ func (s *ReviewService) Create(guideID, reviewer string) (*model.Review, error) 
 	if g == nil {
 		return nil, errors.New("guide not found")
 	}
+	if reviewerUserID != "" && s.userRepo != nil {
+		u, err := s.userRepo.Get(reviewerUserID)
+		if err != nil {
+			return nil, err
+		}
+		reviewer = u.Username
+	}
+	if strings.TrimSpace(reviewer) == "" {
+		return nil, errors.New("reviewer is required")
+	}
 	v := &model.Review{
 		ID: uuid.NewString(), GuideID: guideID, GuideVersion: g.CurrentVersion,
-		Reviewer: reviewer, Status: "pending", CreatedAt: time.Now().Format(time.RFC3339),
+		Reviewer: reviewer, ReviewerUserID: reviewerUserID, Status: "pending", CreatedAt: time.Now().Format(time.RFC3339),
 	}
 	if err := s.repo.Create(v); err != nil {
 		return nil, err

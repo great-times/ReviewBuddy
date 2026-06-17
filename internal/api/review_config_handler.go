@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/service/reviewconfig"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/service/reviewconfig"
 )
 
 type ReviewConfigHandler struct{ svc *reviewconfig.Service }
@@ -21,7 +21,6 @@ func (h *ReviewConfigHandler) RegisterReadOnly(r *gin.RouterGroup) {
 	r.GET("/review-domains/:id/role-users", h.listDomainRoleUsers)
 	r.GET("/review-scenarios", h.listScenarios)
 	r.GET("/me/domains", h.myDomains)
-	r.GET("/users/:id/domains", h.userDomains)
 }
 
 func (h *ReviewConfigHandler) RegisterAdmin(r *gin.RouterGroup) {
@@ -32,6 +31,8 @@ func (h *ReviewConfigHandler) RegisterAdmin(r *gin.RouterGroup) {
 	r.PUT("/review-domains/:id", h.updateDomain)
 	r.DELETE("/review-domains/:id", h.deleteDomain)
 	r.PUT("/review-domains/:id/role-users/:roleKey", h.saveDomainRoleUsers)
+	r.GET("/users-with-domains", h.usersWithDomains)
+	r.GET("/users/:id/domains", h.userDomains)
 	r.PUT("/users/:id/domains", h.saveUserDomains)
 	r.POST("/review-scenarios", h.createScenario)
 	r.PUT("/review-scenarios/:id", h.updateScenario)
@@ -165,6 +166,15 @@ func (h *ReviewConfigHandler) myDomains(c *gin.Context) {
 		return
 	}
 	ok(c, item)
+}
+
+func (h *ReviewConfigHandler) usersWithDomains(c *gin.Context) {
+	items, err := h.svc.ListUsersWithDomains()
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	ok(c, items)
 }
 
 func (h *ReviewConfigHandler) userDomains(c *gin.Context) {

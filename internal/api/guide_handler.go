@@ -7,9 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/service/agent"
-	"changebuddy/internal/service/guide"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/service/agent"
+	"reviewbuddy/internal/service/guide"
 )
 
 type GuideHandler struct{ svc *guide.Service }

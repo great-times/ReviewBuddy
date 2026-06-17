@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/service/settings"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/service/settings"
 )
 
 type SettingsHandler struct{ svc *settings.Service }

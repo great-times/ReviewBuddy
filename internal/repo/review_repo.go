@@ -3,7 +3,7 @@ package repo
 import (
 	"database/sql"
 
-	"changebuddy/internal/model"
+	"reviewbuddy/internal/model"
 )
 
 type ReviewRepo struct{ db *sql.DB }
@@ -11,7 +11,7 @@ type ReviewRepo struct{ db *sql.DB }
 func NewReviewRepo(db *sql.DB) *ReviewRepo { return &ReviewRepo{db: db} }
 
 func (r *ReviewRepo) ListByGuide(guideID string) ([]model.Review, error) {
-	rows, err := r.db.Query(`SELECT id,guide_id,guide_version,reviewer,status,decision_note,created_at,COALESCE(finished_at,'')
+	rows, err := r.db.Query(`SELECT id,guide_id,guide_version,reviewer,COALESCE(reviewer_user_id,''),status,decision_note,created_at,COALESCE(finished_at,'')
 		FROM reviews WHERE guide_id=? ORDER BY created_at DESC`, guideID)
 	if err != nil {
 		return nil, err
@@ -20,7 +20,7 @@ func (r *ReviewRepo) ListByGuide(guideID string) ([]model.Review, error) {
 	out := []model.Review{}
 	for rows.Next() {
 		var v model.Review
-		if err := rows.Scan(&v.ID, &v.GuideID, &v.GuideVersion, &v.Reviewer, &v.Status, &v.DecisionNote, &v.CreatedAt, &v.FinishedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.GuideID, &v.GuideVersion, &v.Reviewer, &v.ReviewerUserID, &v.Status, &v.DecisionNote, &v.CreatedAt, &v.FinishedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -29,9 +29,9 @@ func (r *ReviewRepo) ListByGuide(guideID string) ([]model.Review, error) {
 }
 
 func (r *ReviewRepo) Get(id string) (*model.Review, error) {
-	row := r.db.QueryRow(`SELECT id,guide_id,guide_version,reviewer,status,decision_note,created_at,COALESCE(finished_at,'') FROM reviews WHERE id=?`, id)
+	row := r.db.QueryRow(`SELECT id,guide_id,guide_version,reviewer,COALESCE(reviewer_user_id,''),status,decision_note,created_at,COALESCE(finished_at,'') FROM reviews WHERE id=?`, id)
 	var v model.Review
-	err := row.Scan(&v.ID, &v.GuideID, &v.GuideVersion, &v.Reviewer, &v.Status, &v.DecisionNote, &v.CreatedAt, &v.FinishedAt)
+	err := row.Scan(&v.ID, &v.GuideID, &v.GuideVersion, &v.Reviewer, &v.ReviewerUserID, &v.Status, &v.DecisionNote, &v.CreatedAt, &v.FinishedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -42,9 +42,27 @@ func (r *ReviewRepo) Get(id string) (*model.Review, error) {
 }
 
 func (r *ReviewRepo) Create(v *model.Review) error {
-	_, err := r.db.Exec(`INSERT INTO reviews (id,guide_id,guide_version,reviewer,status,decision_note,created_at)
-		VALUES (?,?,?,?,?,?,?)`, v.ID, v.GuideID, v.GuideVersion, v.Reviewer, v.Status, v.DecisionNote, v.CreatedAt)
+	_, err := r.db.Exec(`INSERT INTO reviews (id,guide_id,guide_version,reviewer,reviewer_user_id,status,decision_note,created_at)
+		VALUES (?,?,?,?,?,?,?,?)`, v.ID, v.GuideID, v.GuideVersion, v.Reviewer, v.ReviewerUserID, v.Status, v.DecisionNote, v.CreatedAt)
 	return err
+}
+
+func (r *ReviewRepo) ListAll() ([]model.Review, error) {
+	rows, err := r.db.Query(`SELECT id,guide_id,guide_version,reviewer,COALESCE(reviewer_user_id,''),status,decision_note,created_at,COALESCE(finished_at,'')
+		FROM reviews ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.Review{}
+	for rows.Next() {
+		var v model.Review
+		if err := rows.Scan(&v.ID, &v.GuideID, &v.GuideVersion, &v.Reviewer, &v.ReviewerUserID, &v.Status, &v.DecisionNote, &v.CreatedAt, &v.FinishedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
 }
 
 func (r *ReviewRepo) Decide(id, status, note, finishedAt string) error {

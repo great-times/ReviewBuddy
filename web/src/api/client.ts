@@ -63,6 +63,7 @@ export interface Review {
   id: string;
   guideId: string;
   reviewer: string;
+  reviewerUserId: string;
   status: string;
   decisionNote: string;
   createdAt: string;
@@ -82,6 +83,10 @@ export interface User {
 
 export interface UserDomains {
   userId: string;
+  domainIds: string[];
+}
+
+export interface UserWithDomains extends User {
   domainIds: string[];
 }
 
@@ -116,6 +121,16 @@ export interface ReviewScenario {
   roleKeys: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DashboardSummary {
+  templates: Template[];
+  guides: Guide[];
+  reviews: Review[];
+  domains: ReviewDomain[];
+  myDomainIds: string[];
+  issueCount: number;
+  ruleCount: number;
 }
 
 export interface LoginResult {
@@ -182,14 +197,16 @@ export const api = {
 
   listReviews: (guideId: string) =>
     http.get<{ data: Review[] }>(`/guides/${guideId}/reviews`).then((r) => r.data.data),
-  createReview: (guideId: string, reviewer: string) =>
-    http.post<{ data: Review }>(`/guides/${guideId}/reviews`, { reviewer }).then((r) => r.data.data),
+  createReview: (guideId: string, reviewerUserId: string, reviewer?: string) =>
+    http.post<{ data: Review }>(`/guides/${guideId}/reviews`, { reviewerUserId, reviewer }).then((r) => r.data.data),
   decideReview: (rid: string, status: string, note: string) =>
     http.post<{ data: Review }>(`/reviews/${rid}/decision`, { status, note }).then((r) => r.data.data),
 
   metrics: () => http.get<{ data: { issueCount: number; ruleCount: number } }>('/metrics/quality').then((r) => r.data.data),
+  dashboard: () => http.get<{ data: DashboardSummary }>('/dashboard').then((r) => r.data.data),
 
   listUsers: () => http.get<{ data: User[] }>('/users').then((r) => r.data.data),
+  listUsersWithDomains: () => http.get<{ data: UserWithDomains[] }>('/users-with-domains').then((r) => r.data.data),
   createUser: (u: Partial<User>) => http.post<{ data: User }>('/users', u).then((r) => r.data.data),
   updateUser: (id: string, u: Partial<User>) => http.put<{ data: User }>(`/users/${id}`, u).then((r) => r.data.data),
   deleteUser: (id: string) => http.delete(`/users/${id}`),

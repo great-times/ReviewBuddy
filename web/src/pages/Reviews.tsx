@@ -63,7 +63,7 @@ export default function Reviews() {
   const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
   const reviewerOptions = users
     .filter((u) => u.role !== 'readonly')
-    .map((u) => ({ value: u.username, label: `${u.username} · ${roleName(u.role)}` }));
+    .map((u) => ({ value: u.id, label: `${u.username} · ${roleName(u.role)}` }));
 
   const applyDefaults = async (nextDomainId = domainId, nextScenarioId = scenarioId) => {
     if (!nextDomainId || !nextScenarioId) return;
@@ -76,7 +76,7 @@ export default function Reviews() {
     const names = roleUsers
       .filter((item) => requiredRoles.includes(item.roleKey))
       .flatMap((item) => item.userIds)
-      .map((id) => usersById[id]?.username)
+      .filter((id) => !!usersById[id])
       .filter(Boolean) as string[];
     setReviewers(Array.from(new Set(names)));
   };
@@ -90,7 +90,7 @@ export default function Reviews() {
     setStreamText('');
     setStreamDone(false);
     const reviews = await api.listReviews(g.id);
-    const existing = reviews.map((r) => r.reviewer).filter(Boolean);
+    const existing = reviews.map((r) => r.reviewerUserId || users.find((u) => u.username === r.reviewer)?.id || '').filter(Boolean);
     if (existing.length > 0) {
       setReviewers(existing);
     } else {
@@ -101,14 +101,14 @@ export default function Reviews() {
   const ensureReviews = async () => {
     if (!active) return [];
     const existing = await api.listReviews(active.id);
-    const existingNames = new Set(existing.map((r) => r.reviewer));
-    for (const name of reviewers) {
-      if (!existingNames.has(name)) {
-        await api.createReview(active.id, name);
+    const existingIds = new Set(existing.map((r) => r.reviewerUserId || users.find((u) => u.username === r.reviewer)?.id || ''));
+    for (const userId of reviewers) {
+      if (!existingIds.has(userId)) {
+        await api.createReview(active.id, userId, usersById[userId]?.username);
       }
     }
     const latest = await api.listReviews(active.id);
-    return latest.length > 0 ? latest : [await api.createReview(active.id, reviewers[0] || '评审人')];
+    return latest.length > 0 ? latest : [await api.createReview(active.id, reviewers[0] || '', usersById[reviewers[0]]?.username || '评审人')];
   };
 
   const toImages = async (): Promise<ImageInput[]> => {

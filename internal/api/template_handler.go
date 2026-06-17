@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/service/template"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/service/template"
 )
 
 type TemplateHandler struct{ svc *template.Service }

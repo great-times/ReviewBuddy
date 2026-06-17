@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/repo"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/repo"
 )
 
 type Service struct{ repo *repo.KnowledgeRepo }

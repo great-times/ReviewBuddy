@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"changebuddy/internal/model"
+	"reviewbuddy/internal/model"
 )
 
 type GuideRepo struct{ db *sql.DB }

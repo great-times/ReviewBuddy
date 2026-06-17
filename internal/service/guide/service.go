@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"changebuddy/internal/model"
-	"changebuddy/internal/repo"
-	"changebuddy/internal/service/agent"
-	"changebuddy/internal/service/knowledge"
+	"reviewbuddy/internal/model"
+	"reviewbuddy/internal/repo"
+	"reviewbuddy/internal/service/agent"
+	"reviewbuddy/internal/service/knowledge"
 )
 
 type Service struct {
