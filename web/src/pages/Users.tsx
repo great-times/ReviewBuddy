@@ -277,12 +277,59 @@ export default function Users() {
             ),
           },
           {
-            key: 'domains',
+            key: 'domain-management',
+            label: '领域管理',
+            children: (
+              <Card
+                title="领域列表"
+                extra={<Button icon={<PlusOutlined />} onClick={() => editDomain()}>新增领域</Button>}
+                style={{ background: 'var(--bg-container)', borderColor: 'var(--border-color)' }}
+              >
+                <Table
+                  rowKey="id"
+                  dataSource={domains}
+                  pagination={false}
+                  columns={[
+                    { title: '领域名称', dataIndex: 'name', width: 180 },
+                    { title: '说明', dataIndex: 'description' },
+                    {
+                      title: '邮件纪要模板',
+                      width: 180,
+                      render: (_, r) => (
+                        <Space>
+                          <Tag color={r.mailSubjectTemplate ? 'blue' : 'default'}>主题</Tag>
+                          <Tag color={r.mailBodyTemplate ? 'green' : 'default'}>正文</Tag>
+                        </Space>
+                      ),
+                    },
+                    {
+                      title: '操作',
+                      width: 180,
+                      render: (_, r) => (
+                        <Space>
+                          <Button size="small" onClick={() => editDomain(r)}>编辑</Button>
+                          <Popconfirm
+                            title="确认删除该领域？"
+                            okText="删除"
+                            cancelText="取消"
+                            onConfirm={() => deleteDomain(r.id)}
+                          >
+                            <Button size="small" danger disabled={r.id === 'default'} icon={<DeleteOutlined />} />
+                          </Popconfirm>
+                        </Space>
+                      ),
+                    },
+                  ]}
+                />
+              </Card>
+            ),
+          },
+          {
+            key: 'domain-role-users',
             label: '领域默认人员',
             children: (
               <Card
                 title="领域角色人员"
-                extra={<Button icon={<PlusOutlined />} onClick={() => editDomain()}>新增领域</Button>}
                 style={{ background: 'var(--bg-container)', borderColor: 'var(--border-color)' }}
               >
                 <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -294,21 +341,6 @@ export default function Users() {
                       options={domains.map((d) => ({ value: d.id, label: d.name }))}
                       onChange={loadRoleUsers}
                     />
-                    {domains.find((d) => d.id === activeDomainId) && (
-                      <>
-                        <Button onClick={() => editDomain(domains.find((d) => d.id === activeDomainId))}>编辑领域</Button>
-                        <Popconfirm
-                          title="确认删除该领域？"
-                          okText="删除"
-                          cancelText="取消"
-                          onConfirm={() => deleteDomain(activeDomainId)}
-                        >
-                          <Button danger disabled={activeDomainId === 'default'} icon={<DeleteOutlined />}>
-                            删除领域
-                          </Button>
-                        </Popconfirm>
-                      </>
-                    )}
                   </Space>
                   <Table
                     rowKey="key"
