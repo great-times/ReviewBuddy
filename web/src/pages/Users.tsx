@@ -139,6 +139,20 @@ export default function Users() {
     }
   };
 
+  const deleteDomain = async (domainId: string) => {
+    try {
+      await api.deleteReviewDomain(domainId);
+      message.success('领域已删除');
+      const remaining = domains.filter((d) => d.id !== domainId);
+      const nextDomainId = remaining[0]?.id || '';
+      setActiveDomainId(nextDomainId);
+      setRoleUsers(nextDomainId ? await api.listDomainRoleUsers(nextDomainId) : []);
+      load();
+    } catch (e: any) {
+      message.error(e.message);
+    }
+  };
+
   const editScenario = (scenario?: ReviewScenario) => {
     const value = scenario || { roleKeys: [] };
     setEditingScenario(value);
@@ -281,7 +295,19 @@ export default function Users() {
                       onChange={loadRoleUsers}
                     />
                     {domains.find((d) => d.id === activeDomainId) && (
-                      <Button onClick={() => editDomain(domains.find((d) => d.id === activeDomainId))}>编辑领域</Button>
+                      <>
+                        <Button onClick={() => editDomain(domains.find((d) => d.id === activeDomainId))}>编辑领域</Button>
+                        <Popconfirm
+                          title="确认删除该领域？"
+                          okText="删除"
+                          cancelText="取消"
+                          onConfirm={() => deleteDomain(activeDomainId)}
+                        >
+                          <Button danger disabled={activeDomainId === 'default'} icon={<DeleteOutlined />}>
+                            删除领域
+                          </Button>
+                        </Popconfirm>
+                      </>
                     )}
                   </Space>
                   <Table
