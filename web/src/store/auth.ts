@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { api, EXPIRES_KEY, LoginResult, TOKEN_KEY, User } from '../api/client';
+import { ACTIVE_ROLE_KEY, api, EXPIRES_KEY, LoginResult, TOKEN_KEY, User } from '../api/client';
+import { effectiveRole, userRoles } from '../utils/roles';
 
 function storedToken() {
   const token = localStorage.getItem(TOKEN_KEY);
@@ -15,8 +16,10 @@ function storedToken() {
 interface AuthState {
   token: string | null;
   user: User | null;
+  activeRole: string;
   restoring: boolean;
   applyLogin: (result: LoginResult) => void;
+  setActiveRole: (role: string) => void;
   restore: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<LoginResult>;
@@ -26,13 +29,26 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   token: storedToken(),
   user: null,
+  activeRole: localStorage.getItem(ACTIVE_ROLE_KEY) || '',
   restoring: false,
 
   applyLogin: (result) => {
     if (!result.token || !result.expiresAt) return;
     localStorage.setItem(TOKEN_KEY, result.token);
     localStorage.setItem(EXPIRES_KEY, result.expiresAt);
-    set({ token: result.token, user: result.user });
+    const roles = userRoles(result.user);
+    const nextRole = roles.includes(localStorage.getItem(ACTIVE_ROLE_KEY) || '')
+      ? localStorage.getItem(ACTIVE_ROLE_KEY) || ''
+      : effectiveRole(result.user);
+    if (nextRole) localStorage.setItem(ACTIVE_ROLE_KEY, nextRole);
+    set({ token: result.token, user: { ...result.user, role: nextRole || result.user.role }, activeRole: nextRole });
+  },
+
+  setActiveRole: (role) => {
+    const user = get().user;
+    if (!user || !userRoles(user).includes(role)) return;
+    localStorage.setItem(ACTIVE_ROLE_KEY, role);
+    set({ activeRole: role, user: { ...user, role } });
   },
 
   restore: async () => {
@@ -44,11 +60,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ token, restoring: true });
     try {
       const user = await api.me();
-      set({ token, user });
+      const nextRole = effectiveRole(user);
+      if (nextRole) localStorage.setItem(ACTIVE_ROLE_KEY, nextRole);
+      set({ token, user, activeRole: nextRole });
     } catch {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(EXPIRES_KEY);
-      set({ token: null, user: null });
+      localStorage.removeItem(ACTIVE_ROLE_KEY);
+      try {
+        const user = await api.me();
+        const nextRole = effectiveRole(user);
+        if (nextRole) localStorage.setItem(ACTIVE_ROLE_KEY, nextRole);
+        set({ token, user, activeRole: nextRole });
+      } catch {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(EXPIRES_KEY);
+        set({ token: null, user: null, activeRole: '' });
+      }
     } finally {
       set({ restoring: false });
     }
@@ -70,7 +96,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } finally {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(EXPIRES_KEY);
-      set({ token: null, user: null });
+      localStorage.removeItem(ACTIVE_ROLE_KEY);
+      set({ token: null, user: null, activeRole: '' });
     }
   },
 }));

@@ -4,11 +4,16 @@ export const http = axios.create({ baseURL: '/api' });
 
 export const TOKEN_KEY = 'reviewbuddy_auth_token';
 export const EXPIRES_KEY = 'reviewbuddy_auth_expires_at';
+export const ACTIVE_ROLE_KEY = 'reviewbuddy_active_role';
 
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  const activeRole = localStorage.getItem(ACTIVE_ROLE_KEY);
+  if (activeRole) {
+    config.headers['X-Active-Role'] = activeRole;
   }
   return config;
 });

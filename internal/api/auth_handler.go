@@ -29,6 +29,12 @@ func (h *AuthHandler) AuthRequired() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "请先登录"})
 			return
 		}
+		if activeRole := strings.TrimSpace(c.GetHeader("X-Active-Role")); activeRole != "" {
+			if !u.UseRole(activeRole) {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "无权切换到该角色"})
+				return
+			}
+		}
 		c.Set("user", u)
 		c.Next()
 	}
@@ -37,7 +43,7 @@ func (h *AuthHandler) AuthRequired() gin.HandlerFunc {
 func (h *AuthHandler) AdminRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		u := CurrentUser(c)
-		if u == nil || !u.HasRole("admin") {
+		if u == nil || u.EffectiveRole() != "admin" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "仅管理员可访问"})
 			return
 		}
@@ -48,7 +54,7 @@ func (h *AuthHandler) AdminRequired() gin.HandlerFunc {
 func ReadWriteRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		u := CurrentUser(c)
-		if u != nil && u.ReadOnlyOnly() {
+		if u != nil && u.EffectiveRole() == "readonly" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "只读角色不能执行增删改操作"})
 			return
 		}

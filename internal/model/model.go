@@ -149,6 +149,13 @@ func (u *User) RoleList() []string {
 	return nil
 }
 
+func (u *User) EffectiveRole() string {
+	if u == nil {
+		return ""
+	}
+	return u.Role
+}
+
 func (u *User) HasRole(role string) bool {
 	for _, item := range u.RoleList() {
 		if item == role {
@@ -156,6 +163,14 @@ func (u *User) HasRole(role string) bool {
 		}
 	}
 	return false
+}
+
+func (u *User) UseRole(role string) bool {
+	if role == "" || !u.HasRole(role) {
+		return false
+	}
+	u.Role = role
+	return true
 }
 
 func (u *User) ReadOnlyOnly() bool {

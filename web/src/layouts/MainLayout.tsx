@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Layout, Menu, Dropdown, Tooltip, Tag, Typography } from 'antd';
 import {
   DashboardOutlined,
@@ -13,12 +14,15 @@ import {
 } from '@ant-design/icons';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
 import Logo from '../components/Logo';
+import { api, ReviewRole } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { useThemeStore } from '../store/theme';
 import { themeList } from '../themes';
-import { hasRole, roleColor, userRoles } from '../utils/roles';
+import { effectiveRole, isActiveRole, roleColor, userRoles } from '../utils/roles';
 
 const { Sider, Header, Content } = Layout;
+
+const systemRoleNames: Record<string, string> = { admin: '管理员', readonly: '只读' };
 
 const menuItems = [
   { key: '/', icon: <DashboardOutlined />, label: '概览', title: '评审助手总览与度量' },
@@ -33,11 +37,22 @@ const menuItems = [
 export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [roleList, setRoleList] = useState<ReviewRole[]>([]);
   const { currentTheme, setTheme } = useThemeStore();
-  const { user, logout } = useAuthStore();
-  const visibleMenuItems = hasRole(user, 'admin') ? menuItems : menuItems.filter((m) => m.key !== '/users');
+  const { user, logout, setActiveRole } = useAuthStore();
+  const visibleMenuItems = isActiveRole(user, 'admin') ? menuItems : menuItems.filter((m) => m.key !== '/users');
   const roles = userRoles(user);
-  const roleLabel = roles.length > 0 ? roles.join(' / ') : '';
+  const activeRole = effectiveRole(user);
+  const roleNameMap = useMemo(
+    () => ({ ...systemRoleNames, ...Object.fromEntries(roleList.map((role) => [role.key, role.name])) }),
+    [roleList]
+  );
+  const roleName = (role: string) => roleNameMap[role] || role;
+  const roleLabel = activeRole ? roleName(activeRole) : '';
+
+  useEffect(() => {
+    api.listReviewRoles().then(setRoleList).catch(() => {});
+  }, []);
 
   const selectedKey =
     visibleMenuItems
@@ -79,11 +94,21 @@ export default function MainLayout() {
               menu={{
                 items: [
                   { key: 'name', label: <Typography.Text type="secondary">{user.username}</Typography.Text>, disabled: true, icon: <UserOutlined /> },
-                  { key: 'role', label: <span>{roles.map((role) => <Tag key={role} color={roleColor(role)}>{role}</Tag>)}</span>, disabled: true },
+                  { key: 'roleTitle', label: <Typography.Text type="secondary">当前角色</Typography.Text>, disabled: true },
+                  ...roles.map((role) => ({
+                    key: `role:${role}`,
+                    label: <Tag color={roleColor(role)}>{roleName(role)}</Tag>,
+                    disabled: role === activeRole,
+                  })),
                   { type: 'divider' },
                   { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
                 ],
                 onClick: ({ key }) => {
+                  if (String(key).startsWith('role:')) {
+                    const nextRole = String(key).replace('role:', '');
+                    setActiveRole(nextRole);
+                    if (nextRole !== 'admin' && location.pathname.startsWith('/users')) navigate('/');
+                  }
                   if (key === 'logout') logout();
                 },
               }}
@@ -91,7 +116,7 @@ export default function MainLayout() {
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-primary)' }}>
                 <UserOutlined />
                 <span>{user.username}</span>
-                <Tag color={hasRole(user, 'admin') ? 'red' : roles.every((role) => role === 'readonly') ? 'default' : 'blue'} style={{ marginInlineEnd: 0 }}>{roleLabel}</Tag>
+                <Tag color={roleColor(activeRole)} style={{ marginInlineEnd: 0 }}>{roleLabel}</Tag>
               </span>
             </Dropdown>
           )}
