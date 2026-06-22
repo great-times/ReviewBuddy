@@ -14,7 +14,11 @@ interface ThemeStore {
   setTheme: (name: ThemeName) => void;
 }
 
-const initial = (localStorage.getItem(STORAGE_KEY) as ThemeName) || defaultTheme.name;
+const savedTheme = localStorage.getItem(STORAGE_KEY) as ThemeName | null;
+const initial = savedTheme && themeConfigs[savedTheme]
+  ? savedTheme
+  : defaultTheme.name;
+localStorage.setItem(STORAGE_KEY, initial);
 applyTheme(initial);
 
 export const useThemeStore = create<ThemeStore>((set) => ({
